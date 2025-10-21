@@ -1,0 +1,43 @@
+import numpy as np 
+import matplotlib.pyplot as plt
+from scipy import ndimage
+import time as t
+Time_end = []
+
+def ouverture(image, structure):
+    eroded = ndimage.binary_erosion(image, structure=structure)
+    opened = ndimage.binary_dilation(eroded, structure=structure)
+    return opened
+ # Définir un élément structurant (ici, un carré 3x3)
+structure = np.ones((2, 2), dtype=np.uint8)
+for i in range(300):
+    time_start = t.time()
+
+    Image = np.random.randint(0, 2, (256, 256))
+    Image_originale = Image.copy()  # Sauvegarder l'image originale
+
+   
+
+    # Ouverture
+    opened = ouverture(Image, structure=structure)
+
+    Image = Image * opened
+    Time_end.append(t.time() - time_start)
+
+print("Temps d'exécution moyen : ", np.mean(Time_end), "secondes +- ", np.std(Time_end))
+
+# Créer les subplots
+fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 5))
+
+# Image avant filtre
+ax1.imshow(Image_originale, cmap='gray')
+ax1.set_title("Image avant filtre")
+ax1.axis('off')
+
+# Image après filtre
+ax2.imshow(Image, cmap='gray')
+ax2.set_title("I alpha")
+ax2.axis('off')
+
+plt.tight_layout()
+plt.show()
