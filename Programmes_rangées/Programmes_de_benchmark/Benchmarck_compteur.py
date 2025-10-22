@@ -1,7 +1,7 @@
 import time
-from Compteur_v1 import compteur_particles
+from Programmes_de_bases.compteur import compteur_particles
 import numpy as np
-from acquisition import read
+from Programmes_de_bases.read_file import read
 import matplotlib.pyplot as plt
 def list_files(folder, recursive=False, extensions=None, fullpath=True, include_hidden=False):
     """
@@ -50,11 +50,12 @@ time_ends = []
 N_alpha_total = []
 N_tracks_total = []
 N_gamma_total = []
-x = np.linspace(100, 1900, 40, dtype=int)  # dt en ms
+x = np.linspace(1, 2000, 2000, dtype=int)  # dt en ms
 dts =[]
 for file in files:
     data = read(file)
-    d_time = max(data.iloc[:, 1]) / x  # Diviser le temps
+    time_max = max(data.iloc[:, 1])
+    d_time = time_max / x  # Diviser le temps
     for i, dt in enumerate(d_time):
         
         time_start = time.time()
@@ -74,7 +75,7 @@ for file in files:
         N_alpha_total.append(N_alpha)
         N_tracks_total.append(N_tracks) 
         N_gamma_total.append(N_gamma)
-        dts.append(dt)
+        dts.append(dt/time_max)
 
 
 fig, axes = plt.subplots(2, 2, figsize=(12, 8))
@@ -85,23 +86,30 @@ ax1.set_title('Alpha')
 ax1.set_xlabel('dt')
 ax1.set_ylabel('Nombre de particules')
 
+ax1.set_yscale('log')
 ax2.plot(dts, N_tracks_total, marker='o', color='C1')
 ax2.set_title('Tracks')
 ax2.set_xlabel('dt')
 ax2.set_ylabel('Nombre de particules')
+ax2.set_yscale('log')
 
 ax3.plot(dts, N_gamma_total, marker='o', color='C2')
 ax3.set_title('Gamma')
 ax3.set_xlabel('dt')
 ax3.set_ylabel('Nombre de particules')
+ax3.set_yscale('log')
 
 ax4.plot(dts, np.array(N_alpha_total) + np.array(N_tracks_total) + np.array(N_gamma_total), 
          marker='o', color='k')
 ax4.set_title('Total')
 ax4.set_xlabel('dt ')
 ax4.set_ylabel('Nombre de particules')
-
+ax4.set_yscale('log')
 fig.tight_layout()
-plt.show()
-
+plt.show(block=False)
+fig2 = plt.figure()
 print(f"Durée totale : {time.time() - start_time} secondes /n Moyenne par fichier : {np.mean(time_ends)} secondes +- {np.std(time_ends)} secondes /n {time_ends}")
+fig2.plot(dts, time_ends, marker='o',label='Temps de calcul du fichier en fonction de dt')
+fig2.xlabel('dt ')
+fig2.ylabel('Temps (s)')
+plt.show()
