@@ -16,7 +16,7 @@ def ouverture_erode(image, structure):
 
 def filtre_alpha(image):
     # Kernel circulaire
-    structure_circulaire = cv.getStructuringElement(cv.MORPH_ELLIPSE, (3, 3))
+    structure_circulaire = cv.getStructuringElement(cv.MORPH_RECT, (3, 3))
 
     # Travailler sur une image binaire dérivée de l'image d'entrée
     binary = (image > 0).astype(np.uint8)
@@ -54,7 +54,7 @@ def filtre_tracks(image):
 
 
 # Lecture des données et création de l'image binaire
-file = "C:/Users/Félix/Desktop/Programmation/Projet_cea/Particle_tracking_algorithme_project_M1-2-IN/DATA-20251022T080148Z-1-001/DATA/Combined_Am_SrY/2.5cm/2.5cm_r0.t3pa"
+file = "C:/Users/Graziani/Desktop/Projet CEA/Particle_tracking_algorithme_project_M1-2-IN/Programmes/5min_beta_SrY_1.5cm_ground_source/5min_beta_SrY_1.5cm_ground_source_r3.t3pa"
 data = read(file)
 d_time = max(data.iloc[:, 1]) / 500  # Diviser le temps
 
@@ -121,8 +121,9 @@ print('Saved:', without_tracks_png, without_tracks_npy)
 
 
 # Créer une grille 2x5 où la dernière colonne est dédiée à la colorbar qui s'étend sur les 2 lignes
-fig = plt.figure(figsize=(14, 10))
-gs = fig.add_gridspec(2, 5, width_ratios=[1, 1, 1, 1, 0.06], height_ratios=[1, 1], hspace=0.25, wspace=0.1)
+fig = plt.figure(figsize=(16, 12))
+# augmenter hspace et wspace pour plus d'espaces entre les images
+gs = fig.add_gridspec(2, 5, width_ratios=[1, 1, 1, 1, 0.06], height_ratios=[1, 1], hspace=0.45, wspace=0.35)
 
 # Axes pour la première ligne (images colorées)
 ax1 = fig.add_subplot(gs[0, 0])
@@ -157,19 +158,19 @@ ax4.set_title("image après filtre (sans tracks)")
 
 # Deuxième ligne : mêmes images mais sans l'image de couleur (grayscale)
 im1b = ax1b.imshow(image_originale, cmap='gray')
-ax1b.set_title("image avant filtre (no color)")
+ax1b.set_title("image avant filtre")
 
-im2b = ax2b.imshow(image_alpha, cmap='gray',)
-ax2b.set_title("image après filtre (alpha) (no color)")
+im2b = ax2b.imshow(image_alpha, cmap='gray')
+ax2b.set_title("image après filtre (alpha)")
 
-im3b = ax3b.imshow(image_tracks, cmap='gray',)
-ax3b.set_title("image après filtre (tracks) (no color)")
+im3b = ax3b.imshow(image_tracks, cmap='gray')
+ax3b.set_title("image après filtre (tracks)")
 
 im4b = ax4b.imshow(image_without_tracks, cmap='gray')
-ax4b.set_title("image après filtre (sans tracks) (no color)")
+ax4b.set_title("image après filtre (sans tracks)")
 
-# Colorbar partagée dans l'axe dédié
-cbar = fig.colorbar(im4, cax=cax, orientation='vertical')
+# Colorbar partagée dans l'axe dédié (utiliser im1 comme mappable pour l'échelle commune)
+cbar = fig.colorbar(im1, cax=cax, orientation='vertical')
 cax.yaxis.tick_right()
 cbar.set_label('TOT')
 

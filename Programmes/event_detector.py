@@ -10,15 +10,7 @@ import matplotlib.pyplot as plt
 from scipy.ndimage import label
 
 #%%
-df = np.load('image_alpha_2.npy')
-
-plt.figure(figsize=(15,15))
-plt.imshow(df, cmap='gray', origin='upper')  # origin='upper' pour que (0,0) soit en haut à gauche
-plt.title("Matrice image")
-plt.xlabel("y")
-plt.ylabel("x")
-plt.colorbar(label='Valeur')
-plt.show()
+df = np.load("C:/Users/Graziani/Desktop/Projet CEA/Particle_tracking_algorithme_project_M1-2-IN/Programmes/output/image_alpha_2.npy")
 
 
 #%% 
@@ -58,6 +50,14 @@ clusters, n_clusters = label(df)
 print(n_clusters)
 
 
+
+plt.figure(figsize=(15,15))
+plt.imshow(df, cmap='gray', origin='upper')  # origin='upper' pour que (0,0) soit en haut à gauche
+plt.title("Matrice image")
+plt.xlabel("y")
+plt.ylabel("x")
+plt.colorbar(label='Valeur')
+plt.show()
 
 
 
