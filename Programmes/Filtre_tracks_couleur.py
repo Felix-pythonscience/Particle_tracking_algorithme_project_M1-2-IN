@@ -16,7 +16,7 @@ def ouverture_erode(image, structure):
 
 def filtre_alpha(image):
     # Kernel circulaire
-    structure_circulaire = cv.getStructuringElement(cv.MORPH_RECT, (3, 3))
+    structure_circulaire = cv.getStructuringElement(cv.MORPH_ELLIPSE, (3, 3))
 
     # Travailler sur une image binaire dérivée de l'image d'entrée
     binary = (image > 0).astype(np.uint8)
