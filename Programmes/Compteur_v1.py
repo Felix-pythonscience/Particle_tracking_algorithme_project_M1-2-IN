@@ -55,9 +55,9 @@ def filtre_tracks(image):
     image_tracks = image * mask
     image_without_tracks = image - image_tracks
     return image_without_tracks, image_tracks
-def compteur_particles(file,plot = False):
-    data = read(file)
-    d_time = max(data.iloc[:, 1]) / 500  # Diviser le temps
+def compteur_particles(file = None, t= 0, d_time = None,plot = False):
+    data = file if not(type(file) == None) else read(file)
+    d_time = d_time if not d_time==None else max(data.iloc[:, 1]) / 500  # Diviser le temps
 
     image = slice(data.to_numpy(), 0, d_time)
 

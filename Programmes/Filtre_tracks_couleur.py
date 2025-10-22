@@ -170,7 +170,7 @@ if __name__ == "__main__":
 
     vmin = float(np.nanmin(image_couleur))
     vmax = float(np.nanmax(image_couleur))
-
+    save_npy(image_originale, os.path.join(output_dir, 'image_originale.npy'))
     # Sauvegarder les PNG en utilisant la même échelle
     save_gray_png(image_alpha * image_couleur, alpha_png, vmin=vmin, vmax=vmax)
     save_npy(image_alpha, alpha_npy)
