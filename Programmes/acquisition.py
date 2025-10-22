@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 
 def read(file):
     df = pd.read_csv(file, sep=r"\s+", header=0)
-    return df.iloc[:, [1,3,4]]
+    return df.iloc[:, [1,2,3]]
 
 
 def slice(data,time,d_time):
