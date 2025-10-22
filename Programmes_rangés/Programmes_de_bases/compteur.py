@@ -1,8 +1,8 @@
 import numpy as np
-from read_file import read,slice,slice_Tot
 from scipy.ndimage import label
-from filtres import filtre_alpha, filtre_tracks
-from plot_results import plot_results
+from .read_file import read,slice,slice_Tot
+from .filtres import filtre_alpha, filtre_tracks
+from .plot_results import plot_results
 
 def compteur_particles(file = "None", t= 0, d_time = None,plot = False):
     """Count particle types in a time window and optionally plot the results.

@@ -1,8 +1,15 @@
 import time
-from Programmes_de_bases.compteur import compteur_particles
+from pathlib import Path
+import sys
 import numpy as np
-from Programmes_de_bases.read_file import read
 import matplotlib.pyplot as plt
+# Ajoute le dossier parent du fichier courant au chemin Python
+parent_dir = Path(__file__).resolve().parent.parent
+sys.path.append(str(parent_dir))
+from Programmes_de_bases.compteur import compteur_particles
+from Programmes_de_bases.read_file import read
+
+
 def list_files(folder, recursive=False, extensions=None, fullpath=True, include_hidden=False):
     """
     Retourne la liste des fichiers dans `folder`.
@@ -41,10 +48,8 @@ def list_files(folder, recursive=False, extensions=None, fullpath=True, include_
             files.append(os.path.abspath(path) if fullpath else name)
 
     return files
-
 start_time = time.time()
-folder = r"C:/Users/Graziani/Desktop/Projet CEA/Particle_tracking_algorithme_project_M1-2-IN/DATA-20251022T080148Z-1-001/DATA/beta_SrY"
-folder = r"C:/Users/Graziani/Desktop/Projet CEA/Particle_tracking_algorithme_project_M1-2-IN/DATA-20251022T080148Z-1-001/DATA/alpha"
+folder = r"C:/Users/Félix/Desktop/Programmation/Projet_cea/Particle_tracking_algorithme_project_M1-2-IN/DATA-20251022T080148Z-1-001/DATA/alpha"
 files = list_files(folder, recursive=True, extensions=['.t3pa'])
 time_ends = []
 N_alpha_total = []
@@ -108,7 +113,7 @@ ax4.set_yscale('log')
 fig.tight_layout()
 plt.show(block=False)
 fig2 = plt.figure()
-print(f"Durée totale : {time.time() - start_time} secondes /n Moyenne par fichier : {np.mean(time_ends)} secondes +- {np.std(time_ends)} secondes /n {time_ends}")
+print(f"Durée totale : {time.time() - start_time} secondes \n Moyenne par fichier : {np.mean(time_ends)} secondes +- {np.std(time_ends)} secondes \n {time_ends}")
 fig2.plot(dts, time_ends, marker='o',label='Temps de calcul du fichier en fonction de dt')
 fig2.xlabel('dt ')
 fig2.ylabel('Temps (s)')
