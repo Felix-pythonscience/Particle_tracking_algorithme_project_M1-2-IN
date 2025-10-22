@@ -1,0 +1,53 @@
+[FileInfo]
+"Acq Serie Index" ("Acquisition serie index"):
+u32[1]
+0 
+
+"Acq Serie Start time" ("Acquisition serie start time"):
+double[1]
+1759495078.643196 
+
+"Acq time" ("Acquisition time [s]"):
+double[1]
+60.000000 
+
+"ChipboardID" ("Chipboard ID"):
+char[9]
+J09-W0139
+
+"DACs" ("DACs"):
+u16[19]
+16 8 128 10 120 1292 492 5 16 8 16 8 40 128 128 128 256 128 128 
+
+"HV" ("High voltage [V]"):
+double[1]
+-450 
+
+"Interface" ("Readout interface"):
+char[7]
+MiniPIX
+
+"Mpx type" ("Medipix type (1-MXR, 2-TPX, 3-MPX3, 4-TPX3, 5-TPX2)"):
+i32[1]
+4 
+
+"Pixet version" ("Pixet version"):
+char[5]
+1.7.8
+
+"Shutter open time" ("Shutter open timestamp"):
+double[1]
+1759495078.707074 
+
+"Start time" ("Acquisition start time"):
+double[1]
+1759495078.707074 
+
+"Start time (string)" ("Acquisition start time (string)"):
+char[64]
+Fri Oct  3 14:37:58.707074 2025
+
+"Threshold" ("Threshold [keV]"):
+double[1]
+4.975774 
+
