@@ -100,14 +100,10 @@ without_tracks_png = os.path.join(output_dir, 'image_without_tracks.png')
 without_tracks_npy = os.path.join(output_dir, 'image_without_tracks.npy')
 
 # Déterminer vmin/vmax communs pour toutes les images (utiliser les données non colorées pour les échelles)
-all_vals = np.concatenate([
-    image_originale.flatten(),
-    image_alpha.flatten(),
-    image_tracks.flatten(),
-    image_without_tracks.flatten()
-])
-vmin = float(np.nanmin(all_vals))
-vmax = float(np.nanmax(all_vals))
+
+
+vmin = float(np.nanmin(image_couleur))
+vmax = float(np.nanmax(image_couleur))
 
 # Sauvegarder les PNG en utilisant la même échelle
 save_gray_png(image_alpha * image_couleur, alpha_png, vmin=vmin, vmax=vmax)
@@ -160,16 +156,16 @@ im4 = ax4.imshow(image_without_tracks * image_couleur, cmap='viridis', vmin=vmin
 ax4.set_title("image après filtre (sans tracks)")
 
 # Deuxième ligne : mêmes images mais sans l'image de couleur (grayscale)
-im1b = ax1b.imshow(image_originale, cmap='gray', vmin=vmin, vmax=vmax)
+im1b = ax1b.imshow(image_originale, cmap='gray')
 ax1b.set_title("image avant filtre (no color)")
 
-im2b = ax2b.imshow(image_alpha, cmap='gray', vmin=vmin, vmax=vmax)
+im2b = ax2b.imshow(image_alpha, cmap='gray',)
 ax2b.set_title("image après filtre (alpha) (no color)")
 
-im3b = ax3b.imshow(image_tracks, cmap='gray', vmin=vmin, vmax=vmax)
+im3b = ax3b.imshow(image_tracks, cmap='gray',)
 ax3b.set_title("image après filtre (tracks) (no color)")
 
-im4b = ax4b.imshow(image_without_tracks, cmap='gray', vmin=vmin, vmax=vmax)
+im4b = ax4b.imshow(image_without_tracks, cmap='gray')
 ax4b.set_title("image après filtre (sans tracks) (no color)")
 
 # Colorbar partagée dans l'axe dédié
