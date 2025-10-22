@@ -49,13 +49,14 @@ def list_files(folder, recursive=False, extensions=None, fullpath=True, include_
 
     return files
 start_time = time.time()
+script_dir = Path(__file__).resolve().parent
 folder = r"C:/Users/Félix/Desktop/Programmation/Projet_cea/Particle_tracking_algorithme_project_M1-2-IN/DATA-20251022T080148Z-1-001/DATA/alpha"
 files = list_files(folder, recursive=True, extensions=['.t3pa'])
 time_ends = []
 N_alpha_total = []
 N_tracks_total = []
 N_gamma_total = []
-x = np.linspace(1, 2000, 2000, dtype=int)  # dt en ms
+x = np.linspace(1, 2000, 100, dtype=int)  # dt en ms
 dts =[]
 for file in files:
     data = read(file)
@@ -67,8 +68,11 @@ for file in files:
         N_alpha, N_tracks, N_gamma = 0, 0, 0
 
         for t in range(x[i]):
-            print(f" Traitement du temps {t+1}/{x[i]}",end='\r', flush=True)
-            N_alpha_dt, N_tracks_dt, N_gamma_dt = compteur_particles(file= data,t=t * dt,d_time=dt, plot= False)
+            print(f" Traitement du temps {t+1}/{x[i]}", end='\r', flush=True)
+            N_alpha_dt, N_tracks_dt, N_gamma_dt = compteur_particles(file=data, t=t * dt, d_time=dt,
+                                                                     save=[True if t == 0 else False,
+                                                                           Path(f"dt = 1 divisé par {x[i]}"),
+                                                                           script_dir / "Benchmark_Results" / "compteur" / "Evolution_détections_en_fonction_de_dt"])
             N_alpha += N_alpha_dt
             N_tracks += N_tracks_dt
             N_gamma += N_gamma_dt
@@ -111,10 +115,21 @@ ax4.set_xlabel('dt ')
 ax4.set_ylabel('Nombre de particules')
 ax4.set_yscale('log')
 fig.tight_layout()
+
+
+outdir = script_dir / "Benchmark_Results" / "compteur"
+outdir.mkdir(parents=True, exist_ok=True)
+fig.savefig(outdir / "N_detections_en_fonction_de_dt.png", dpi=300, bbox_inches='tight')
+
 plt.show(block=False)
+
 fig2 = plt.figure()
 print(f"Durée totale : {time.time() - start_time} secondes \n Moyenne par fichier : {np.mean(time_ends)} secondes +- {np.std(time_ends)} secondes \n {time_ends}")
 fig2.plot(dts, time_ends, marker='o',label='Temps de calcul du fichier en fonction de dt')
 fig2.xlabel('dt ')
 fig2.ylabel('Temps (s)')
+plt.tight_layout()
+
+outdir.mkdir(parents=True, exist_ok=True)
+fig.savefig(outdir / "Temps_dExecution_en_fonction_de_dt.png", dpi=300, bbox_inches='tight')
 plt.show()

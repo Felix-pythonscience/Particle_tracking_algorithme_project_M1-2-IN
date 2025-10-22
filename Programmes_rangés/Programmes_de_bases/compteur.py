@@ -1,10 +1,11 @@
 import numpy as np
 from scipy.ndimage import label
+from pathlib import Path
 from .read_file import read,slice,slice_Tot
 from .filtres import filtre_alpha, filtre_tracks
 from .plot_results import plot_results
 
-def compteur_particles(file = "None", t= 0, d_time = None,plot = False):
+def compteur_particles(file = "None", t= 0, d_time = None, plot = False, save = [False,"plot_results.png",Path.cwd()]):
     """Count particle types in a time window and optionally plot the results.
 
     This function reads the data (or accepts an already-loaded DataFrame/array),
@@ -37,16 +38,26 @@ def compteur_particles(file = "None", t= 0, d_time = None,plot = False):
 
     image_without_alpha, image_alpha = filtre_alpha(image)# Appliquer le filtre pour enlever les tracks
 
-    image_without_tracks, image_tracks = filtre_tracks(image_without_alpha)# Appliquer le filtre pour enlever les tracks
+    image_gamma, image_tracks = filtre_tracks(image_without_alpha)# Appliquer le filtre pour enlever les tracks
 
     N_alpha = label(image_alpha)[1]
     N_tracks = label(image_tracks)[1]   
-    N_gamma = label(image_without_tracks)[1]
+    N_gamma = label(image_gamma)[1]
     if plot:
-        image_couleur = slice_Tot(data.to_numpy(), 0, d_time) # Image colorier par le TOT pour visualisation
-        plot_results(image, image_alpha, image_tracks, image_without_tracks, image_couleur)
+        image_couleur = slice_Tot(data.to_numpy(), 0, d_time) # Image coloriée par le TOT pour visualisation
+        plot_results(image, image_alpha, image_tracks, image_gamma, image_couleur, block = False, save=save)
+    if save[0]:
+        outdir = Path(save[2]) / Path(save[1])
+        outdir.mkdir(parents=True, exist_ok=True)
+        np.save(outdir / "image_originale.npy", image.astype(np.uint8), allow_pickle=False)
+        np.save(outdir / "image_alpha.npy", image_alpha.astype(np.uint8), allow_pickle=False)
+        np.save(outdir / "image_tracks.npy", image_tracks.astype(np.uint8), allow_pickle=False)
+        np.save(outdir / "image_gamma.npy", image_gamma.astype(np.uint8), allow_pickle=False)
+
+
 
     return N_alpha, N_tracks, N_gamma
+
 if __name__ == "__main__":
     # Lecture des données et création de l'image binaire
     #file = "C:/Users/Graziani/Desktop/Projet CEA/Particle_tracking_algorithme_project_M1-2-IN/DATA-20251022T080148Z-1-001/DATA/alpha/60sec_alpha_39kbq_2.5cm_r0.t3pa"

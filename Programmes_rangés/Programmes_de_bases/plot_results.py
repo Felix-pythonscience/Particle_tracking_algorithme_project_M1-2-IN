@@ -1,7 +1,8 @@
 import matplotlib.pyplot as plt
 import numpy as np
+from pathlib import Path
 # Affichage : encapsulé dans une fonction et colorbar limitée à la première ligne
-def plot_results(image_originale, image_alpha, image_tracks, image_without_tracks, image_couleur, figsize=(16, 12)):
+def plot_results(image_originale, image_alpha, image_tracks, image_gamma, image_couleur, figsize=(16, 12),block=True, save = [False,"plot_results.png",Path.cwd()]):
     """Plot the detection images with a shared colorbar and grayscale second row.
 
     The top row shows the four images multiplied by `image_couleur` (for TOT-colored
@@ -51,7 +52,7 @@ def plot_results(image_originale, image_alpha, image_tracks, image_without_track
     ax3.set_title("image tracks")
 
     # image sans tracks - couleur
-    im4 = ax4.imshow(image_without_tracks * image_couleur, cmap='viridis', vmin=vmin, vmax=vmax)
+    im4 = ax4.imshow(image_gamma * image_couleur, cmap='viridis', vmin=vmin, vmax=vmax)
     ax4.set_title("image gammas")
 
     # Deuxième ligne : mêmes images mais en grayscale (pas de colorbar)
@@ -64,13 +65,14 @@ def plot_results(image_originale, image_alpha, image_tracks, image_without_track
     im3b = ax3b.imshow(image_tracks, cmap='gray')
     ax3b.set_title("image tracks")
 
-    im4b = ax4b.imshow(image_without_tracks, cmap='gray')
+    im4b = ax4b.imshow(image_gamma, cmap='gray')
     ax4b.set_title("image gammas")
 
     # Colorbar attachée à l'axe cax (qui couvre uniquement la première ligne)
     cbar = fig.colorbar(im1, cax=cax, orientation='vertical')
     cax.yaxis.tick_right()
     cbar.set_label('TOT')
-
     plt.tight_layout()
-    plt.show()
+    if save[0]:
+        fig.savefig( Path(save[2]) / save[1], dpi=300, bbox_inches='tight')
+    plt.show(block=block)
