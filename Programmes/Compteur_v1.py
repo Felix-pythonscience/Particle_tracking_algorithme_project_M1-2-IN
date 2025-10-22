@@ -55,15 +55,15 @@ def filtre_tracks(image):
     image_tracks = image * mask
     image_without_tracks = image - image_tracks
     return image_without_tracks, image_tracks
-def compteur_particles(file = None, t= 0, d_time = None,plot = False):
-    data = file if not(type(file) == None) else read(file)
-    d_time = d_time if not d_time==None else max(data.iloc[:, 1]) / 500  # Diviser le temps
+def compteur_particles(file = "None", t= 0, d_time = None,plot = False):
+    data = file if not(type(file) == str) else read(file)
+    d_time = d_time if not d_time==None else max(data.iloc[:, 1]) / 100  # Diviser le temps
 
     image = slice(data.to_numpy(), 0, d_time)
 
-    image_couleur = slice_Tot(data.to_numpy(), 0, d_time)
+    
 
-    image_originale = image.copy()  # Sauvegarder l'image originale
+    
 
     image_without_alpha, image_alpha = filtre_alpha(image)# Appliquer le filtre pour enlever les tracks
 
@@ -73,6 +73,8 @@ def compteur_particles(file = None, t= 0, d_time = None,plot = False):
     N_tracks = label(image_tracks)[1]   
     N_gamma = label(image_without_tracks)[1]
     if plot:
+        image_originale = image # Sauvegarder l'image originale
+        image_couleur = slice_Tot(data.to_numpy(), 0, d_time)
         plot_results(image_originale, image_alpha, image_tracks, image_without_tracks, image_couleur)
     return N_alpha, N_tracks, N_gamma
 if __name__ == "__main__":
@@ -81,7 +83,7 @@ if __name__ == "__main__":
     file = "C:/Users/Graziani/Desktop/Projet CEA/Particle_tracking_algorithme_project_M1-2-IN/DATA-20251022T080148Z-1-001/DATA/Combined_Am_SrY/2.5cm/2.5cm_r0.t3pa"
 
 
-    N_alpha, N_tracks, N_gamma = compteur_particles(file, plot=True)
+    N_alpha, N_tracks, N_gamma = compteur_particles(file =file, plot=True)
 
     print(f"Nombre de particules alpha détectées : {N_alpha}")
     print(f"Nombre de particules tracks détectées : {N_tracks}")    

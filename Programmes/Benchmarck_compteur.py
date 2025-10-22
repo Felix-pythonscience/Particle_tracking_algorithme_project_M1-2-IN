@@ -2,7 +2,7 @@ import time
 from Compteur_v1 import compteur_particles
 import numpy as np
 from acquisition import read
-
+import matplotlib.pyplot as plt
 def list_files(folder, recursive=False, extensions=None, fullpath=True, include_hidden=False):
     """
     Retourne la liste des fichiers dans `folder`.
@@ -44,23 +44,64 @@ def list_files(folder, recursive=False, extensions=None, fullpath=True, include_
 
 start_time = time.time()
 folder = r"C:/Users/Graziani/Desktop/Projet CEA/Particle_tracking_algorithme_project_M1-2-IN/DATA-20251022T080148Z-1-001/DATA/beta_SrY"
+folder = r"C:/Users/Graziani/Desktop/Projet CEA/Particle_tracking_algorithme_project_M1-2-IN/DATA-20251022T080148Z-1-001/DATA/alpha"
 files = list_files(folder, recursive=True, extensions=['.t3pa'])
 time_ends = []
+N_alpha_total = []
+N_tracks_total = []
+N_gamma_total = []
+x = np.linspace(100, 1900, 40, dtype=int)  # dt en ms
+dts =[]
 for file in files:
     data = read(file)
-    d_time = max(data.iloc[:, 1]) / 500  # Diviser le temps
-    time_start = time.time()
-    N_alpha, N_tracks, N_gamma = 0, 0, 0
-    
-    for t in range(500):  # Répéter 3 fois pour moyenne
-        N_alpha_dt, N_tracks_dt, N_gamma_dt = compteur_particles(file= data,t=t * d_time,d_time=d_time, plot=False)
-        N_alpha += N_alpha_dt
-        N_tracks += N_tracks_dt
-        N_gamma += N_gamma_dt
-    time_ends.append(time.time() - time_start)
-    print(f"Fichier: {file} numéro {files.index(file)+1}/{len(files)}")
-    print(f"  Nombre de particules alpha détectées : {N_alpha}")
-    print(f"  Nombre de particules tracks détectées : {N_tracks}")    
-    print(f"  Nombre de particules gamma détectées : {N_gamma}")
+    d_time = max(data.iloc[:, 1]) / x  # Diviser le temps
+    for i, dt in enumerate(d_time):
+        
+        time_start = time.time()
+        N_alpha, N_tracks, N_gamma = 0, 0, 0
+
+        for t in range(x[i]):
+            print(f" Traitement du temps {t+1}/{x[i]}",end='\r', flush=True)
+            N_alpha_dt, N_tracks_dt, N_gamma_dt = compteur_particles(file= data,t=t * dt,d_time=dt, plot= False)
+            N_alpha += N_alpha_dt
+            N_tracks += N_tracks_dt
+            N_gamma += N_gamma_dt
+        time_ends.append(time.time() - time_start)
+        print(f"Fichier: {file} numéro {files.index(file)+1}/{len(files)}")
+        print(f"  Nombre de particules alpha détectées : {N_alpha}")
+        print(f"  Nombre de particules tracks détectées : {N_tracks}")    
+        print(f"  Nombre de particules gamma détectées : {N_gamma}")
+        N_alpha_total.append(N_alpha)
+        N_tracks_total.append(N_tracks) 
+        N_gamma_total.append(N_gamma)
+        dts.append(dt)
+
+
+fig, axes = plt.subplots(2, 2, figsize=(12, 8))
+ax1, ax2, ax3, ax4 = axes.ravel()
+
+ax1.plot(dts, N_alpha_total, marker='o')
+ax1.set_title('Alpha')
+ax1.set_xlabel('dt')
+ax1.set_ylabel('Nombre de particules')
+
+ax2.plot(dts, N_tracks_total, marker='o', color='C1')
+ax2.set_title('Tracks')
+ax2.set_xlabel('dt')
+ax2.set_ylabel('Nombre de particules')
+
+ax3.plot(dts, N_gamma_total, marker='o', color='C2')
+ax3.set_title('Gamma')
+ax3.set_xlabel('dt')
+ax3.set_ylabel('Nombre de particules')
+
+ax4.plot(dts, np.array(N_alpha_total) + np.array(N_tracks_total) + np.array(N_gamma_total), 
+         marker='o', color='k')
+ax4.set_title('Total')
+ax4.set_xlabel('dt ')
+ax4.set_ylabel('Nombre de particules')
+
+fig.tight_layout()
+plt.show()
 
 print(f"Durée totale : {time.time() - start_time} secondes /n Moyenne par fichier : {np.mean(time_ends)} secondes +- {np.std(time_ends)} secondes /n {time_ends}")
