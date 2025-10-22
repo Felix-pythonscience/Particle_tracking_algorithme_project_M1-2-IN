@@ -1,3 +1,6 @@
+# Contient l'ensemble des fonctions nécessaires à l'acquisition des fichiers de données
+
+
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
@@ -32,23 +35,3 @@ def slice_Tot(data,time,d_time):
         y = index % 256
         image[x,y] = detection[2]
     return image
-
-
-if __name__ == "__main__":
-    # Test pour des gammas d'Am241
-    file = "C:/Users/Félix/Desktop/Programmation/Projet_cea/Particle_tracking_algorithme_project_M1-2-IN/Données expérimentales/5min_beta_SrY_1.5cm_ground_source/5min_beta_SrY_1.5cm_ground_source_r0.t3pa"
-    data = read(file)
-    d_time = max(data.iloc[:,1])/500  # Diviser le temps
-
-    image = slice(data.to_numpy(),0, d_time)
-
-    # Affichage de la matrice comme image
-    plt.figure(figsize=(6,6))
-    plt.imshow(image, cmap='gray', origin='upper')  # origin='upper' pour que (0,0) soit en haut à gauche
-    plt.title("Matrice image")
-    plt.xlabel("y")
-    plt.ylabel("x")
-    plt.colorbar(label='Valeur')
-    plt.show()
-
-

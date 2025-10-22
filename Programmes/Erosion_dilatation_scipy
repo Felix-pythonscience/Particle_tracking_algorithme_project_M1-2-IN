@@ -8,7 +8,8 @@ def ouverture(image, structure):
     eroded = ndimage.binary_erosion(image, structure=structure)
     opened = ndimage.binary_dilation(eroded, structure=structure)
     return opened
- # Définir un élément structurant (ici, un carré 3x3)
+
+ # Définition d'un élément structurant
 structure = np.ones((2, 2), dtype=np.uint8)
 for i in range(300):
     time_start = t.time()
