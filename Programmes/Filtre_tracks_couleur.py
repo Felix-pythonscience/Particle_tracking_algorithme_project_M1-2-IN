@@ -93,11 +93,11 @@ def save_npy(arr, path):
 
 # Sauvegarder les images (PNG pour visualisation et NPY pour données brutes)
 alpha_png = os.path.join(output_dir, 'image_alpha.png')
-alpha_npy = os.path.join(output_dir, 'image_alpha.npy')
+alpha_npy = os.path.join(output_dir, 'image_alpha_2.npy')
 tracks_png = os.path.join(output_dir, 'image_tracks.png')
-tracks_npy = os.path.join(output_dir, 'image_tracks.npy')
+tracks_npy = os.path.join(output_dir, 'image_tracks_2.npy')
 without_tracks_png = os.path.join(output_dir, 'image_without_tracks.png')
-without_tracks_npy = os.path.join(output_dir, 'image_without_tracks.npy')
+without_tracks_npy = os.path.join(output_dir, 'image_without_tracks_2.npy')
 
 # Déterminer vmin/vmax communs pour toutes les images (utiliser les données non colorées pour les échelles)
 
