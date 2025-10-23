@@ -71,8 +71,8 @@ for file in files:
             print(f" Traitement du temps {t+1}/{x[i]}", end='\r', flush=True)
             N_alpha_dt, N_tracks_dt, N_gamma_dt = compteur_particles(file=data, t=t * dt, d_time=dt,
                                                                      save=[True if t == 0 else False,
-                                                                           Path(f"dt = 1 divisé par {x[i]}"),
-                                                                           script_dir / "Benchmark_Results" / "compteur" / "Evolution_détections_en_fonction_de_dt"])
+                                                                           Path(f"dt = 1 divisé par {str(x[i]).zfill(4)}"),
+                                                                           script_dir / "Benchmark_Results" / "compteur2" / "Evolution_détections_en_fonction_de_dt"])
             N_alpha += N_alpha_dt
             N_tracks += N_tracks_dt
             N_gamma += N_gamma_dt
@@ -116,19 +116,21 @@ ax4.set_xscale('log')
 fig.tight_layout()
 
 
-outdir = script_dir / "Benchmark_Results" / "compteur"
+outdir = script_dir / "Benchmark_Results" / "compteur2"
 outdir.mkdir(parents=True, exist_ok=True)
 fig.savefig(outdir / "N_detections_en_fonction_de_dt.png", dpi=300, bbox_inches='tight')
 
 plt.show(block=False)
 
-fig2 = plt.figure()
+fig2, ax_time = plt.subplots(figsize=(8, 4))
 print(f"Durée totale : {time.time() - start_time} secondes \n Moyenne par fichier : {np.mean(time_ends)} secondes +- {np.std(time_ends)} secondes \n {time_ends}")
-fig2.plot(dts, time_ends, marker='o',label='Temps de calcul du fichier en fonction de dt')
-fig2.xlabel('dt ')
-fig2.ylabel('Temps (s)')
+ax_time.plot(dts, time_ends, marker='o', label='Temps de calcul du fichier en fonction de dt')
+ax_time.set_xlabel('dt')
+ax_time.set_ylabel('Temps (s)')
+ax_time.set_xscale('log')
+ax_time.legend()
 plt.tight_layout()
 
 outdir.mkdir(parents=True, exist_ok=True)
-fig.savefig(outdir / "Temps_dExecution_en_fonction_de_dt.png", dpi=300, bbox_inches='tight')
+fig2.savefig(outdir / "Temps_dExecution_en_fonction_de_dt.png", dpi=300, bbox_inches='tight')
 plt.show()

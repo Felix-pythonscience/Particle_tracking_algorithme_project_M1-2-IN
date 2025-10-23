@@ -24,7 +24,10 @@ def compteur_particles(file = "None", t= 0, d_time = None, plot = False, save = 
         Duration of the time window. If None, defaults to max(time)/100.
     plot : bool, optional
         If True, display diagnostic plots using `plot_results`.
-
+    save : list, optional
+        A list where the first element is a boolean indicating whether to save the results or not,
+        the second element is the last folder for the saveds plots, and the third element
+        is the path where the results should be saved.
     Returns
     -------
     tuple
