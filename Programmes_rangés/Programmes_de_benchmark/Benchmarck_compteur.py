@@ -94,26 +94,25 @@ ax1.plot(dts, N_alpha_total, marker='o')
 ax1.set_title('Alpha')
 ax1.set_xlabel('dt')
 ax1.set_ylabel('Nombre de particules')
-
-ax1.set_yscale('log')
+ax1.set_xscale('log')
 ax2.plot(dts, N_tracks_total, marker='o', color='C1')
 ax2.set_title('Tracks')
 ax2.set_xlabel('dt')
 ax2.set_ylabel('Nombre de particules')
-ax2.set_yscale('log')
+ax2.set_xscale('log')
 
 ax3.plot(dts, N_gamma_total, marker='o', color='C2')
 ax3.set_title('Gamma')
 ax3.set_xlabel('dt')
 ax3.set_ylabel('Nombre de particules')
-ax3.set_yscale('log')
+ax3.set_xscale('log')
 
 ax4.plot(dts, np.array(N_alpha_total) + np.array(N_tracks_total) + np.array(N_gamma_total), 
          marker='o', color='k')
 ax4.set_title('Total')
 ax4.set_xlabel('dt ')
 ax4.set_ylabel('Nombre de particules')
-ax4.set_yscale('log')
+ax4.set_xscale('log')
 fig.tight_layout()
 
 
