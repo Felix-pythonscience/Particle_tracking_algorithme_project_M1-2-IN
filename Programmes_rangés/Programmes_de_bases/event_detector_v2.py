@@ -2,65 +2,57 @@
 """
 Created on Wed Oct 22 14:42:30 2025
 
-@author: crphyA1
+@author: sebwi
 """
-#%%
+
 import numpy as np
 from scipy.ndimage import label, sum as ndi_sum
-import matplotlib.pyplot as plt
 
-#%%
+#%% Recupere le fichier
 df = np.load("image_alpha_3.npy")
-df_full = np.load("image_originale.npy")
 
-#%%
-def compter_evenements_chevauchants(matrice: np.ndarray) -> int:
+#%% Fonction de comptage
+def event_counting_alpha(alpha_matrix) :
 
     # Si matrice vide -> problème
-    if np.sum(matrice) == 0:
+    if np.sum(alpha_matrix) == 0:
         return 0
 
     # Labelise et compte le nombre de cluster trouvé sans critere de chevauchement 
     structure = np.ones((3, 3), dtype=int)  # crée une matrice 2D de 3 sur 3 remplie 1 qui correspond aux 8 positions possibles autour du pixel observé
-    labeled_matrix, num_clusters = label(matrice, structure=structure)  
+    labeled_matrix, num_clusters = label(alpha_matrix, structure=structure)  # fonction de scipy pour compter les cluster et avoir une matrice avec chaque cluster labelisé
+    #print("Nombre de cluster sans filtre de chevauchement : ", num_clusters, "\n")
 
     # Calcul de la taille de chaque cluster.
     labels = np.arange(1, num_clusters + 1)     # liste avec les indices de chaque cluster (1,...,nmax de cluster)
-    sizes = ndi_sum(matrice, labeled_matrix, labels)    # liste de la taille de chaque cluster
-    #print(sizes)
+    #print("Label de chaque cluster : \n", labels, "\n") 
+    sizes = ndi_sum(alpha_matrix, labeled_matrix, labels)    # liste de la taille de chaque cluster
+    #print("Taille des clusters : \n",sizes, "\n")
     
     # Estimation taille mediane des alphas
     typical_size = np.median(sizes)     # on recupere la mediane des tailles de cluster pour pouvoir compter correctement les chevauchement 
-    #print(typical_size)
-
-    # Prise en compte des chevauchements
-    estimated_counts = np.round(sizes / typical_size)   # arrondi de la taille des cluster par rapport a la taille mediane
-    print(estimated_counts)
-    total_events = int(np.sum(estimated_counts))    # valeur du comptage avec prise en compte du chevauchement
+    #print("Taille médiane : ", typical_size, "\n")
     
-    return total_events, labeled_matrix
+    # Prise en compte des chevauchements
+    estimated_counts = np.round(sizes / typical_size)   # liste de l'arrondi de la taille des cluster par rapport a la taille mediane
+    estimated_counts[estimated_counts == 0] = 1     # transforme les arrondis 0 en 1 
+    #print("Liste des rapport de taille avec la médiane : \n", estimated_counts, "\n")
+    total_events = int(np.sum(estimated_counts))    # valeur du comptage avec prise en compte du chevauchement  (somme de la liste estimated_sounts)
+    #print("Nombre de cluster avec filtre de chevauchement : ", total_events, "\n")
+    
+    # Matrice avec valeur du rapport pour chaque cluster
+    overlap_matrix = labeled_matrix.copy()
+    for i in np.unique(labeled_matrix):
+        if i != 0:
+            overlap_matrix[labeled_matrix == i] = estimated_counts[i - 1]
+
+    return total_events
 
 
 
 
-n_event,labeled_matrix = compter_evenements_chevauchants(df)
-print(n_event)
+total_events = event_counting_alpha(df)
+print("Comptage : ",total_events)
 
 
 
-
-plt.figure(figsize=(15,15))
-plt.imshow(df_full, cmap='gray', origin='upper')  # origin='upper' pour que (0,0) soit en haut à gauche
-plt.title("Matrice de tout")
-plt.xlabel("y")
-plt.ylabel("x")
-plt.colorbar(label='Valeur')
-plt.show()
-
-plt.figure(figsize=(15,15))
-plt.imshow(df, cmap='gray', origin='upper')  # origin='upper' pour que (0,0) soit en haut à gauche
-plt.title("Matrice des alphas")
-plt.xlabel("y")
-plt.ylabel("x")
-plt.colorbar(label='Valeur')
-plt.show()
