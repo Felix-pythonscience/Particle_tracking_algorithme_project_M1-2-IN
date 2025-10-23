@@ -8,12 +8,6 @@ Created on Wed Oct 22 14:42:30 2025
 import numpy as np
 from scipy.ndimage import label, sum as ndi_sum
 
-
-#%% Recupere le fichier
-
-df = np.load("image_alpha_3.npy")
-df2 = np.load("C:/Users/sebwi/Desktop/Projet instru/test_compteur/image_tracks.npy")
-
 #%% Fonction de comptage alpha
 
 def event_counting_alpha(alpha_matrix) :
@@ -65,7 +59,3 @@ def event_counting_beta_gamma(beta_gamma_matrix) :
     labeled_matrix, num_clusters = label(beta_gamma_matrix, structure=structure)     # fonction de scipy pour compter les cluster et avoir une matrice avec chaque cluster labelisé
 
     return num_clusters
-
-
-print(event_counting_alpha(df))
-print(event_counting_beta_gamma(df2))
