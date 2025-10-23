@@ -153,12 +153,31 @@ class NpyViewer(tk.Tk):
             expected = ["image_originale.npy", "image_alpha.npy", "image_tracks.npy", "image_gamma.npy"]
             sibling_paths = [path / name for name in expected]
             if all(p.exists() for p in sibling_paths):
-                # display using the first file as entry point
+                # load arrays and validate shapes before auto-display
                 try:
-                    self.display_npy(sibling_paths[0])
+                    arrays = [np.load(p, allow_pickle=False) for p in sibling_paths]
                 except Exception as e:
-                    messagebox.showerror('Error', f'Failed to display group: {e}')
-                return
+                    messagebox.showerror('Error', f'Failed to load group: {e}')
+                    return
+                shapes = [a.shape for a in arrays]
+                all_2d = all(getattr(a, 'ndim', 0) == 2 for a in arrays)
+                if not all_2d or len(set(shapes)) != 1:
+                    messagebox.showwarning('Warning', f'Not auto-displaying: group arrays have incompatible shapes: {shapes}')
+                    # fall through to normal folder expansion
+                else:
+                    try:
+                        vmax = max(a.max() for a in arrays)
+                        vmin = min(a.min() for a in arrays)
+                    except Exception:
+                        vmin = vmax = None
+                    self.current_group = dict(zip(['original', 'alpha', 'tracks', 'gamma'], arrays))
+                    self._plot_group(vmin, vmax)
+                    # show folder name as badge/title
+                    try:
+                        self.fig.suptitle(path.name)
+                    except Exception:
+                        pass
+                    return
         if path.is_dir():
             # If already populated (and not only a 'loading...' placeholder) do nothing
             children = list(self.tree.get_children(node))

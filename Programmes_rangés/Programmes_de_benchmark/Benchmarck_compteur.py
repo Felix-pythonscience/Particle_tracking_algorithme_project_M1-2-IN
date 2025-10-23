@@ -50,15 +50,15 @@ def list_files(folder, recursive=False, extensions=None, fullpath=True, include_
     return files
 start_time = time.time()
 script_dir = Path(__file__).resolve().parent
-folder = r"C:/Users/Félix/Desktop/Programmation/Projet_cea/Particle_tracking_algorithme_project_M1-2-IN/DATA-20251022T080148Z-1-001/DATA/alpha"
+folder = r"C:/Users/Félix/Desktop/Programmation/Projet_cea/Particle_tracking_algorithme_project_M1-2-IN/DATA-20251022T080148Z-1-001/DATA/combined_Am_SrY/2.5cm"
 files = list_files(folder, recursive=True, extensions=['.t3pa'])
 time_ends = []
 N_alpha_total = []
 N_tracks_total = []
 N_gamma_total = []
-x = np.linspace(300, 2000, 100, dtype=int)  # dt en ms
+x = np.linspace(100, 2000, 100, dtype=int)  # dt en ms
 dts =[]
-for file in files:
+for file in [files[0]]:
     data = read(file)
     time_max = max(data.iloc[:, 1])
     d_time = time_max / x  # Diviser le temps
@@ -72,7 +72,7 @@ for file in files:
             N_alpha_dt, N_tracks_dt, N_gamma_dt = compteur_particles(file=data, t=t * dt, d_time=dt,
                                                                      save=[True if t == 0 else False,
                                                                            Path(f"dt = 1 divisé par {str(x[i]).zfill(4)}"),
-                                                                           script_dir / "Benchmark_Results" / "compteur4" / "Evolution_détections_en_fonction_de_dt"])
+                                                                           script_dir / "Benchmark_Results" / "compteur5" / "Evolution_détections_en_fonction_de_dt"])
             N_alpha += N_alpha_dt
             N_tracks += N_tracks_dt
             N_gamma += N_gamma_dt
