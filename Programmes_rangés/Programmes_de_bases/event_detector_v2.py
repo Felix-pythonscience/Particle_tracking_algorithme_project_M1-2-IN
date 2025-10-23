@@ -8,10 +8,14 @@ Created on Wed Oct 22 14:42:30 2025
 import numpy as np
 from scipy.ndimage import label, sum as ndi_sum
 
-#%% Recupere le fichier
-df = np.load("image_alpha_3.npy")
 
-#%% Fonction de comptage
+#%% Recupere le fichier
+
+df = np.load("image_alpha_3.npy")
+df2 = np.load("C:/Users/sebwi/Desktop/Projet instru/test_compteur/image_tracks.npy")
+
+#%% Fonction de comptage alpha
+
 def event_counting_alpha(alpha_matrix) :
 
     # Si matrice vide -> problème
@@ -20,7 +24,7 @@ def event_counting_alpha(alpha_matrix) :
 
     # Labelise et compte le nombre de cluster trouvé sans critere de chevauchement 
     structure = np.ones((3, 3), dtype=int)  # crée une matrice 2D de 3 sur 3 remplie 1 qui correspond aux 8 positions possibles autour du pixel observé
-    labeled_matrix, num_clusters = label(alpha_matrix, structure=structure)  # fonction de scipy pour compter les cluster et avoir une matrice avec chaque cluster labelisé
+    labeled_matrix, num_clusters = label(alpha_matrix, structure=structure)      # fonction de scipy pour compter les cluster et avoir une matrice avec chaque cluster labelisé
     #print("Nombre de cluster sans filtre de chevauchement : ", num_clusters, "\n")
 
     # Calcul de la taille de chaque cluster.
@@ -48,11 +52,20 @@ def event_counting_alpha(alpha_matrix) :
 
     return total_events
 
+#%% Fonction de comptage beta/muons/
+
+def event_counting_beta_gamma(beta_gamma_matrix) :
+   
+    # Si matrice vide -> problème
+    if np.sum(beta_gamma_matrix) == 0:
+        return 0
+    
+    # Labelise et compte le nombre de cluster trouvé
+    structure = np.ones((3, 3), dtype=int)  # crée une matrice 2D 3c et 3l de 1 qui correspond aux 8 positions possibles autour du pixel observé
+    labeled_matrix, num_clusters = label(beta_gamma_matrix, structure=structure)     # fonction de scipy pour compter les cluster et avoir une matrice avec chaque cluster labelisé
+
+    return num_clusters
 
 
-
-total_events = event_counting_alpha(df)
-print("Comptage : ",total_events)
-
-
-
+print(event_counting_alpha(df))
+print(event_counting_beta_gamma(df2))
