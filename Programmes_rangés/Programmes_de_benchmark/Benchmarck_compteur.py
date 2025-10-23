@@ -56,7 +56,7 @@ time_ends = []
 N_alpha_total = []
 N_tracks_total = []
 N_gamma_total = []
-x = np.linspace(1, 2000, 100, dtype=int)  # dt en ms
+x = np.linspace(300, 2000, 100, dtype=int)  # dt en ms
 dts =[]
 for file in files:
     data = read(file)
@@ -72,7 +72,7 @@ for file in files:
             N_alpha_dt, N_tracks_dt, N_gamma_dt = compteur_particles(file=data, t=t * dt, d_time=dt,
                                                                      save=[True if t == 0 else False,
                                                                            Path(f"dt = 1 divisé par {str(x[i]).zfill(4)}"),
-                                                                           script_dir / "Benchmark_Results" / "compteur2" / "Evolution_détections_en_fonction_de_dt"])
+                                                                           script_dir / "Benchmark_Results" / "compteur4" / "Evolution_détections_en_fonction_de_dt"])
             N_alpha += N_alpha_dt
             N_tracks += N_tracks_dt
             N_gamma += N_gamma_dt
@@ -116,7 +116,7 @@ ax4.set_xscale('log')
 fig.tight_layout()
 
 
-outdir = script_dir / "Benchmark_Results" / "compteur2"
+outdir = script_dir / "Benchmark_Results" / "compteur4"
 outdir.mkdir(parents=True, exist_ok=True)
 fig.savefig(outdir / "N_detections_en_fonction_de_dt.png", dpi=300, bbox_inches='tight')
 
