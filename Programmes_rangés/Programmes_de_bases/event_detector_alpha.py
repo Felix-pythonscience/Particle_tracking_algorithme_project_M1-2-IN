@@ -6,8 +6,9 @@ Created on Wed Oct 22 14:42:30 2025
 """
 
 import numpy as np
-import matplotlib.pyplot as plt
 from scipy.ndimage import label, sum as ndi_sum
+import matplotlib.pyplot as plt
+
 
 #%% Fonction de comptage alpha
 
@@ -39,25 +40,26 @@ def event_counting_alpha(alpha_matrix) :
     total_events = int(np.sum(estimated_counts))    # valeur du comptage avec prise en compte du chevauchement  (somme de la liste estimated_sounts)
     #print("Nombre de cluster avec filtre de chevauchement : ", total_events, "\n")
     
+    """ POUR CHECK SI IL Y A BIEN UN OVERLAP
     # Matrice avec valeur du rapport pour chaque cluster
     overlap_matrix = labeled_matrix.copy()
     for i in np.unique(labeled_matrix):
         if i != 0:
             overlap_matrix[labeled_matrix == i] = estimated_counts[i - 1]
-
-    return total_events,overlap_matrix
-
-
-if __name__ == "__main__":
+    """
     
-#%% Recupere le fichier
-    df = np.load("C:/Users/Félix/Desktop/Programmation/Projet_cea/Particle_tracking_algorithme_project_M1-2-IN/Programmes_rangés/Programmes_de_benchmark/Benchmark_Results/compteur2/Evolution_détections_en_fonction_de_dt/dt = 1 divisé par 1636/image_alpha.npy")
+    return total_events
 
-    total_events, overlap_matrix = event_counting_alpha(df)
-    print("Comptage : ", total_events)
-    # Optionnel : afficher la matrice de chevauchement
-    plt.imshow(overlap_matrix, cmap='viridis', interpolation='nearest')
-    cbar = plt.colorbar()
-    cbar.ax.yaxis.set_label_text('Valeur', fontsize=14)
-    plt.title("Matrice de chevauchement", fontsize=16)
-    plt.show()
+#%% Fonction de comptage beta/muons/
+
+def event_counting_beta_gamma(beta_gamma_matrix) :
+   
+    # Si matrice vide -> problème
+    if np.sum(beta_gamma_matrix) == 0:
+        return 0
+    
+    # Labelise et compte le nombre de cluster trouvé
+    structure = np.ones((3, 3), dtype=int)  # crée une matrice 2D 3c et 3l de 1 qui correspond aux 8 positions possibles autour du pixel observé
+    labeled_matrix, num_clusters = label(beta_gamma_matrix, structure=structure)     # fonction de scipy pour compter les cluster et avoir une matrice avec chaque cluster labelisé
+
+    return num_clusters
