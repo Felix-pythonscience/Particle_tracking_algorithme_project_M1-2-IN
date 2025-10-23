@@ -6,10 +6,11 @@ Created on Wed Oct 22 14:42:30 2025
 """
 
 import numpy as np
+import matplotlib.pyplot as plt
 from scipy.ndimage import label, sum as ndi_sum
 
-#%% Recupere le fichier
-df = np.load("image_alpha_3.npy")
+# Set global font size for plots to 20 for readability
+plt.rcParams.update({'font.size': 20})
 
 #%% Fonction de comptage
 def event_counting_alpha(alpha_matrix) :
@@ -46,13 +47,19 @@ def event_counting_alpha(alpha_matrix) :
         if i != 0:
             overlap_matrix[labeled_matrix == i] = estimated_counts[i - 1]
 
-    return total_events
+    return total_events,overlap_matrix
 
 
+if __name__ == "__main__":
+    
+#%% Recupere le fichier
+    df = np.load("C:/Users/Félix/Desktop/Programmation/Projet_cea/Particle_tracking_algorithme_project_M1-2-IN/Programmes_rangés/Programmes_de_benchmark/Benchmark_Results/compteur2/Evolution_détections_en_fonction_de_dt/dt = 1 divisé par 1636/image_alpha.npy")
 
-
-total_events = event_counting_alpha(df)
-print("Comptage : ",total_events)
-
-
-
+    total_events, overlap_matrix = event_counting_alpha(df)
+    print("Comptage : ", total_events)
+    # Optionnel : afficher la matrice de chevauchement
+    plt.imshow(overlap_matrix, cmap='viridis', interpolation='nearest')
+    cbar = plt.colorbar()
+    cbar.ax.yaxis.set_label_text('Valeur', fontsize=14)
+    plt.title("Matrice de chevauchement", fontsize=16)
+    plt.show()
