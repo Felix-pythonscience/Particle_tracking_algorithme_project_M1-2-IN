@@ -9,10 +9,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 from scipy.ndimage import label, sum as ndi_sum
 
-# Set global font size for plots to 20 for readability
-plt.rcParams.update({'font.size': 20})
+#%% Fonction de comptage alpha
 
-#%% Fonction de comptage
 def event_counting_alpha(alpha_matrix) :
 
     # Si matrice vide -> problème
@@ -21,7 +19,7 @@ def event_counting_alpha(alpha_matrix) :
 
     # Labelise et compte le nombre de cluster trouvé sans critere de chevauchement 
     structure = np.ones((3, 3), dtype=int)  # crée une matrice 2D de 3 sur 3 remplie 1 qui correspond aux 8 positions possibles autour du pixel observé
-    labeled_matrix, num_clusters = label(alpha_matrix, structure=structure)  # fonction de scipy pour compter les cluster et avoir une matrice avec chaque cluster labelisé
+    labeled_matrix, num_clusters = label(alpha_matrix, structure=structure)      # fonction de scipy pour compter les cluster et avoir une matrice avec chaque cluster labelisé
     #print("Nombre de cluster sans filtre de chevauchement : ", num_clusters, "\n")
 
     # Calcul de la taille de chaque cluster.
