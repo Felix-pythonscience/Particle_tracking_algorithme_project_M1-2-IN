@@ -340,7 +340,7 @@ class NpyViewer(tk.Tk):
         if not f:
             return
         try:
-            self.fig.savefig(f, dpi=300, bbox_inches='tight')
+            self.fig.savefig(f, dpi=1000, bbox_inches='tight')
             messagebox.showinfo('Saved', f'Saved view to {f}')
         except Exception as e:
             messagebox.showerror('Error', f'Failed to save: {e}')

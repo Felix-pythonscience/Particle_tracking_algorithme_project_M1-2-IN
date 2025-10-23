@@ -5,7 +5,7 @@ from .read_file import read,slice,slice_Tot
 from .filtres import filtre_alpha, filtre_tracks
 from .plot_results import plot_results
 
-def compteur_particles(file = "None", t= 0, d_time = None, plot = False, save = [False,"plot_results.png",Path.cwd()]):
+def compteur_particles(file = "None", t= 0, d_time = None, plot = False,block = False, save = [False,"plot_results.png",Path.cwd()]):
     """Count particle types in a time window and optionally plot the results.
 
     This function reads the data (or accepts an already-loaded DataFrame/array),
@@ -37,7 +37,7 @@ def compteur_particles(file = "None", t= 0, d_time = None, plot = False, save = 
 
     d_time = d_time if not d_time==None else max(data.iloc[:, 1]) / 100  # Diviser le temps
 
-    image = slice(data.to_numpy(), 0, d_time)
+    image = slice(data.to_numpy(), t, d_time)
 
     image_without_alpha, image_alpha = filtre_alpha(image)# Appliquer le filtre pour enlever les tracks
 
@@ -47,8 +47,8 @@ def compteur_particles(file = "None", t= 0, d_time = None, plot = False, save = 
     N_tracks = label(image_tracks)[1]   
     N_gamma = label(image_gamma)[1]
     if plot:
-        image_couleur = slice_Tot(data.to_numpy(), 0, d_time) # Image coloriée par le TOT pour visualisation
-        plot_results(image, image_alpha, image_tracks, image_gamma, image_couleur, block = False, save=save)
+        image_couleur = slice_Tot(data.to_numpy(), t, d_time) # Image coloriée par le TOT pour visualisation
+        plot_results(image, image_alpha, image_tracks, image_gamma, image_couleur, block = block, save=save)
     if save[0]:
         outdir = Path(save[2]) / Path(save[1])
         outdir.mkdir(parents=True, exist_ok=True)
