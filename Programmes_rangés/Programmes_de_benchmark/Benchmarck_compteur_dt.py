@@ -89,7 +89,8 @@ files = list_files(folder, recursive=True, extensions=['.t3pa'])
 # Listes pour stocker les résultats et temps
 time_ends = []
 N_alpha_total = []
-N_tracks_total = []
+N_electrons_total = []
+N_muons_total = []
 N_gamma_total = []
 
 # x contient les différentes résolutions temporelles testées (nombre de sous-intervalles)
@@ -108,14 +109,15 @@ for file in [files[0]]:
         # Début du chronométrage pour cette valeur de dt
         time_start = time.time()
         # compteurs cumulés pour ce fichier et ce dt
-        N_alpha, N_tracks, N_gamma = 0, 0, 0
+        N_alpha, N_electrons, N_muons, N_gamma = 0, 0, 0, 0
 
         # Traitement des x[i] fenêtres temporelles pour cette résolution
         for t in range(x[i]):
             # Affiche une progression sur la même ligne
             print(f" Traitement du temps {t+1}/{x[i]}", end='\r', flush=True)
             # Appel de la fonction de comptage sur la tranche courante
-            N_alpha_dt, N_tracks_dt, N_gamma_dt = compteur_particles(
+            
+            N_alpha_dt, N_electrons_dt, N_muons_dt, N_gamma_dt = compteur_particles(
                 file=data,  # on passe l'objet DataFrame directement pour éviter une relecture disque
                 t=t * dt,  # temps de départ de la tranche
                 d_time=dt,  # durée de la tranche
@@ -124,18 +126,21 @@ for file in [files[0]]:
                       script_dir / "Benchmark_Results" / "compteur5" / "Evolution_détections_en_fonction_de_dt"])
             # Accumule les résultats
             N_alpha += N_alpha_dt
-            N_tracks += N_tracks_dt
+            N_electrons += N_electrons_dt
+            N_muons += N_muons_dt
             N_gamma += N_gamma_dt
         # Mesure le temps écoulé pour ce fichier et ce dt
         time_ends.append(time.time() - time_start)
         # Affiche un résumé pour l'utilisateur
         print(f"Fichier: {file} numéro {files.index(file)+1}/{len(files)}")
         print(f"  Nombre de particules alpha détectées : {N_alpha}")
-        print(f"  Nombre de particules tracks détectées : {N_tracks}")
+        print(f"  Nombre de particules électrons détectées : {N_electrons}")
+        print(f"  Nombre de particules muons détectées : {N_muons}")
         print(f"  Nombre de particules gamma détectées : {N_gamma}")
         # Stocke les résultats pour tracés ultérieurs
         N_alpha_total.append(N_alpha)
-        N_tracks_total.append(N_tracks)
+        N_electrons_total.append(N_electrons)
+        N_muons_total.append(N_muons)
         N_gamma_total.append(N_gamma)
         dts.append(dt / time_max)
 

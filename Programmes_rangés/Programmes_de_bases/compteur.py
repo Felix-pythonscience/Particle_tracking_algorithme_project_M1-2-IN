@@ -1,11 +1,26 @@
 import numpy as np
 from scipy.ndimage import label
 from pathlib import Path
-from .read_file import read,slice,slice_Tot
-from .filtres import filtre_alpha, filtre_tracks
-from .plot_results import plot_results
+try:
+    # allow running as part of a package (preferred)
+    from .read_file import read, slice, slice_Tot
+    from .filtres import filtre_alpha, filtre_tracks
+    from .plot_results import plot_results
+    from .event_detector_v3 import event_counting_alpha, event_counting_electron_muon,event_counting_photon
+    # diagnostic: indicate which import branch succeeded
+   
+except Exception:
+    # fallback when the module is executed directly as a script
+    # attempt to import from the same directory
+    from read_file import read, slice, slice_Tot
+    from filtres import filtre_alpha, filtre_tracks
+    from plot_results import plot_results
+    from event_detector_v3 import event_counting_alpha, event_counting_electron_muon,event_counting_photon
+    # diagnostic: indicate fallback import used
+   
 
-def compteur_particles(file = "None", t= 0, d_time = None, plot = False, block = False, save = [False,"plot_results.png",Path.cwd()], images_debug=False):
+
+def compteur_particles(file = "None", t = 0, d_time = None, plot = False, block = False, save = [False,"plot_results.png",Path.cwd()], images_debug=False):
     """Count particle types in a time window and optionally plot the results.
 
     This function reads the data (or accepts an already-loaded DataFrame/array),
@@ -36,8 +51,7 @@ def compteur_particles(file = "None", t= 0, d_time = None, plot = False, block =
         (N_alpha, N_tracks, N_gamma) counts of connected components for each class.
     """
     data = file if not(type(file) == str) else read(file)
-
-    d_time = d_time if not d_time==None else max(data.iloc[:, 1]) / 100  # Diviser le temps
+    d_time = d_time if d_time!=None else max(data.iloc[:, 1]) / 100  # Diviser le temps
 
     image = slice(data.to_numpy(), t, d_time)
 
@@ -45,11 +59,12 @@ def compteur_particles(file = "None", t= 0, d_time = None, plot = False, block =
 
     image_gamma, image_tracks = filtre_tracks(image_without_alpha)# Appliquer le filtre pour enlever les tracks
 
-    N_alpha = label(image_alpha)[1]
-    N_tracks = label(image_tracks)[1]   
-    N_gamma = label(image_gamma)[1]
+    N_alpha = event_counting_alpha(image_alpha)
+    N_electrons , N_muons = event_counting_electron_muon(image_tracks)
+    N_gamma = event_counting_photon(image_gamma)
+    print(N_electrons)
+    print(N_muons)
 
-    
     if images_debug:
         return image, image_alpha, image_tracks, image_gamma
 
@@ -68,15 +83,16 @@ def compteur_particles(file = "None", t= 0, d_time = None, plot = False, block =
 
 
 
-    return N_alpha, N_tracks, N_gamma
+    return N_alpha, N_electrons, N_muons, N_gamma
 
 if __name__ == "__main__":
     # Lecture des données et création de l'image binaire
     #file = "C:/Users/Graziani/Desktop/Projet CEA/Particle_tracking_algorithme_project_M1-2-IN/DATA-20251022T080148Z-1-001/DATA/alpha/60sec_alpha_39kbq_2.5cm_r0.t3pa"
-    file = "C:/Users/Graziani/Desktop/Projet CEA/Particle_tracking_algorithme_project_M1-2-IN/DATA-20251022T080148Z-1-001/DATA/Combined_Am_SrY/2.5cm/2.5cm_r0.t3pa"
-    
-    N_alpha, N_tracks, N_gamma = compteur_particles(file =file, plot=True)
+    file = "C:/Users/Félix/Desktop/Programmation/Projet_cea/Particle_tracking_algorithme_project_M1-2-IN/DATA-20251022T080148Z-1-001/DATA/beta_SrY/5min_beta_SrY_3cm_ground_source/5min_beta_SrY_3cm_ground_source_r1.t3pa"
+
+    N_alpha, N_electrons, N_muons, N_gamma = compteur_particles(file = file, plot=True)
 
     print(f"Nombre de particules alpha détectées : {N_alpha}")
-    print(f"Nombre de particules tracks détectées : {N_tracks}")    
+    print(f"Nombre de particules électrons détectées : {N_electrons}")
+    print(f"Nombre de particules muons détectées : {N_muons}")
     print(f"Nombre de particules gamma détectées : {N_gamma}")
