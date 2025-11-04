@@ -7,14 +7,16 @@ Created on Wed Oct 22 14:42:30 2025
 
 import numpy as np
 from scipy.ndimage import label, sum as ndi_sum
-#import matplotlib.pyplot as plt
+import matplotlib.pyplot as plt
 from skimage.measure import regionprops
 
 #%% Recupere le fichier
 
+df = np.load("muon_electron.npy")   
+
 #%% Fonction de comptage alpha
 
-def event_counting_alpha(alpha_matrix) :
+def event_counting_alpha(alpha_matrix, plot_result=True) :
 
     # Si matrice vide -> problème
     if np.sum(alpha_matrix) == 0:
@@ -42,45 +44,73 @@ def event_counting_alpha(alpha_matrix) :
     aplha_count = int(np.sum(estimated_counts))    # valeur du comptage avec prise en compte du chevauchement  (somme de la liste estimated_sounts)
     #print("Nombre de cluster avec filtre de chevauchement : ", aplha_count, "\n")
     
-    """
-    # Matrice avec valeur du rapport pour chaque cluster
-    overlap_matrix = labeled_matrix.copy()
-    for i in np.unique(labeled_matrix):
-        if i != 0:
-            overlap_matrix[labeled_matrix == i] = estimated_counts[i - 1]
-    """
+    
+    # Affichage du graphique optionel des chevauchements
+    if plot_result:   
+        overlap_matrix = labeled_matrix.copy()
+        for i in np.unique(labeled_matrix):
+            if i != 0:
+                overlap_matrix[labeled_matrix == i] = estimated_counts[i - 1]
+        plt.figure(figsize=(10,10))
+        plt.imshow(overlap_matrix, cmap='hot', origin='upper')
+        plt.title("Classification des chevauchements")
+        plt.xlabel("X")
+        plt.ylabel("Y")
     
     return aplha_count
 
 #%% Fonction de comptage beta/muons/
 
-def event_counting_electron_muon(electron_muon_matrix) :
+def event_counting_electron_muon(electron_muon_matrix, plot_result=True) :
 
     # Si matrice vide -> problème
     if not np.any(electron_muon_matrix):
         return 0
     
-    # Critère discri muons 
-    eccentricity_threshold=0.90
-    solidity_threshold=0.95
+    # Critère discri 
+    eccentricity_threshold = 0.99
+    solidity_threshold = 0.99
+    area_threshold = 10
     
     # Labelise et compte le nombre de cluster trouvé
     structure = np.ones((3, 3), dtype=int)  # crée une matrice 2D 3c et 3l de 1 qui correspond aux 8 positions possibles autour du pixel observé
     labeled_matrix, num_clusters = label(electron_muon_matrix, structure=structure)     # fonction de scipy pour compter les cluster et avoir une matrice avec chaque cluster labelisé
 
-    # Variables qui contiendront le nombre d'électrons et de muons 
+    # Variables qui contiendront le nombre d'électrons, de muons et d'alphas
     muon_count = 0
     electron_count = 0
+    alpha_count = 0
+    
+    # Matrice pour visualiser la discrimination
+    classification_matrix = np.zeros_like(labeled_matrix, dtype=int)
     
     # Discrimination
     for props in regionprops(labeled_matrix, intensity_image=electron_muon_matrix):     # on regarde chaque cluster
-        is_muon = (props.solidity >= solidity_threshold) and (props.eccentricity >= eccentricity_threshold)     # on vérifie les conditions solidi/eccentri (booléen)
-        if is_muon:     # booléen = True
+        is_muon = (props.eccentricity >= eccentricity_threshold) and (props.area > area_threshold)    # on vérifie les conditions solidi/eccentri (booléen)
+        is_alpha = (props.solidity >= solidity_threshold) and (props.area > area_threshold)
+        #print(is_muon, "Soli :", props.solidity, "   Eccentri :", props.eccentricity)
+        
+        if is_muon:
             muon_count += 1
-        else:   # booléen = False
+            classification_matrix[labeled_matrix == props.label] = 2
+            print("muon", props.eccentricity)
+        elif is_alpha:
+            alpha_count += 1
+            classification_matrix[labeled_matrix == props.label] = 1
+            print("alpha", props.solidity)
+        else:
             electron_count += 1
+            classification_matrix[labeled_matrix == props.label] = 3
 
-    return electron_count, muon_count
+    # Affichage du graphique optionel des discriminations
+    if plot_result:
+        plt.figure(figsize=(10,10))
+        plt.imshow(classification_matrix, cmap='hot', origin='upper')
+        plt.title(f"Classification des particules (Électrons: {electron_count}, Muons: {muon_count}, Alphas: {alpha_count})")
+        plt.xlabel("X")
+        plt.ylabel("Y")
+        
+    return electron_count, muon_count, alpha_count
 
 
 #%% Fonction de comptage photons
@@ -93,14 +123,5 @@ def event_counting_photon(photon_matrix) :
     return photon_count
 
 
-#%% Graphique
-"""
-plt.figure(figsize=(8,8))
-plt.imshow(df, cmap='grey', origin='upper')
-plt.xlabel("x")
-plt.ylabel("y")
-plt.title("Alpha overlap")
-plt.colorbar(label='Cluster size / Median of all clusters (rounded)')
-
-print(event_counting_electron_muon(df))
-"""
+#%% Appel
+print(event_counting_electron_muon(df, False))
