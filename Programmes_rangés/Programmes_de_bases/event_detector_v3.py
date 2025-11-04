@@ -10,11 +10,6 @@ from scipy.ndimage import label, sum as ndi_sum
 import matplotlib.pyplot as plt
 from skimage.measure import regionprops
 
-#%% Recupere le fichier
-
-df = np.load("muon_electron.npy")   
-
-#%% Fonction de comptage alpha
 
 def event_counting_alpha(alpha_matrix, plot_result=True) :
 
@@ -123,5 +118,3 @@ def event_counting_photon(photon_matrix) :
     return photon_count
 
 
-#%% Appel
-print(event_counting_electron_muon(df, False))
