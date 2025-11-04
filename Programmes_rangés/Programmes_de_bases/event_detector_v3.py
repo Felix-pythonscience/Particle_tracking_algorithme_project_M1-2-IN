@@ -65,10 +65,6 @@ def event_counting_electron_muon(electron_muon_matrix) :
     # Critère discri muons 
     eccentricity_threshold=0.90
     solidity_threshold=0.95
-
-    # Si matrice vide -> problème
-    if np.sum(electron_muon_matrix) == 0:
-        return 0
     
     # Labelise et compte le nombre de cluster trouvé
     structure = np.ones((3, 3), dtype=int)  # crée une matrice 2D 3c et 3l de 1 qui correspond aux 8 positions possibles autour du pixel observé
@@ -79,15 +75,11 @@ def event_counting_electron_muon(electron_muon_matrix) :
     electron_count = 0
     
     # Discrimination
-    for props in regionprops(labeled_matrix, intensity_image=electron_muon_matrix):
-        if props.label == 0:
-            continue
-        is_muon = (props.solidity >= solidity_threshold) and \
-                  (props.eccentricity >= eccentricity_threshold)
-        
-        if is_muon:
+    for props in regionprops(labeled_matrix, intensity_image=electron_muon_matrix):     # on regarde chaque cluster
+        is_muon = (props.solidity >= solidity_threshold) and (props.eccentricity >= eccentricity_threshold)     # on vérifie les conditions solidi/eccentri (booléen)
+        if is_muon:     # booléen = True
             muon_count += 1
-        else:
+        else:   # booléen = False
             electron_count += 1
 
     return electron_count, muon_count
