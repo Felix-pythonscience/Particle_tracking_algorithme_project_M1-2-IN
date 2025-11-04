@@ -5,7 +5,7 @@ from .read_file import read,slice,slice_Tot
 from .filtres import filtre_alpha, filtre_tracks
 from .plot_results import plot_results
 
-def compteur_particles(file = "None", t= 0, d_time = None, plot = False,block = False, save = [False,"plot_results.png",Path.cwd()]):
+def compteur_particles(file = "None", t= 0, d_time = None, plot = False, block = False, save = [False,"plot_results.png",Path.cwd()], images_debug=False):
     """Count particle types in a time window and optionally plot the results.
 
     This function reads the data (or accepts an already-loaded DataFrame/array),
@@ -28,6 +28,8 @@ def compteur_particles(file = "None", t= 0, d_time = None, plot = False,block = 
         A list where the first element is a boolean indicating whether to save the results or not,
         the second element is the last folder for the saveds plots, and the third element
         is the path where the results should be saved.
+    images_debug : bool, optional
+        If True, return the intermediate images for or things.
     Returns
     -------
     tuple
@@ -46,9 +48,16 @@ def compteur_particles(file = "None", t= 0, d_time = None, plot = False,block = 
     N_alpha = label(image_alpha)[1]
     N_tracks = label(image_tracks)[1]   
     N_gamma = label(image_gamma)[1]
+
+    
+    if images_debug:
+        return image, image_alpha, image_tracks, image_gamma
+
     if plot:
+
         image_couleur = slice_Tot(data.to_numpy(), t, d_time) # Image coloriée par le TOT pour visualisation
         plot_results(image, image_alpha, image_tracks, image_gamma, image_couleur, block = block, save=save)
+
     if save[0]:
         outdir = Path(save[2]) / Path(save[1])
         outdir.mkdir(parents=True, exist_ok=True)
