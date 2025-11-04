@@ -20,7 +20,7 @@ except Exception:
    
 
 
-def compteur_particles(file = "None", t = 0, d_time = None, plot = False, block = False, save = [False,"plot_results.png",Path.cwd()], images_debug=False):
+def compteur_particles(file = "None", t= 0, d_time = None, plot = False, block = False, save = [False,"plot_results.png",Path.cwd()], images_debug=False):
     """Count particle types in a time window and optionally plot the results.
 
     This function reads the data (or accepts an already-loaded DataFrame/array),
@@ -54,7 +54,8 @@ def compteur_particles(file = "None", t = 0, d_time = None, plot = False, block 
     d_time = d_time if d_time!=None else max(data.iloc[:, 1]) / 100  # Diviser le temps
 
     image = slice(data.to_numpy(), t, d_time)
-
+    if images_debug:
+        return image
     image_without_alpha, image_alpha = filtre_alpha(image)# Appliquer le filtre pour enlever les tracks
 
     image_gamma, image_tracks = filtre_tracks(image_without_alpha)# Appliquer le filtre pour enlever les tracks
@@ -62,11 +63,9 @@ def compteur_particles(file = "None", t = 0, d_time = None, plot = False, block 
     N_alpha = event_counting_alpha(image_alpha)
     N_electrons , N_muons = event_counting_electron_muon(image_tracks)
     N_gamma = event_counting_photon(image_gamma)
-    print(N_electrons)
-    print(N_muons)
 
-    if images_debug:
-        return image, image_alpha, image_tracks, image_gamma
+
+    
 
     if plot:
 

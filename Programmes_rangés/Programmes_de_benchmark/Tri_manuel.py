@@ -5,7 +5,8 @@ import numpy as np  # calcul numérique
 import matplotlib.pyplot as plt  # tracés
 from scipy.ndimage import label, sum as ndi_sum
 from matplotlib.widgets import Button
-from datetime import datetime
+from matplotlib.colors import ListedColormap
+from datetime import datetime, timezone
 import csv
 import argparse
 import os
@@ -20,6 +21,7 @@ sys.path.append(str(parent_dir))
 # Imports des fonctions du package local
 from Programmes_de_bases.compteur import compteur_particles
 from Programmes_de_bases.read_file import read
+
 
 if __name__ == "__main__":
     # Arguments CLI
@@ -80,25 +82,60 @@ if __name__ == "__main__":
         processing_times = 0
         structure = np.ones((3, 3), dtype=int)
 
-        # Récupère la matrice binaire/étiquetée depuis la fonction de comptage
-        Data = compteur_particles(file=file, plot=False, images_debug=True)[0]
-        labeled_matrix, num_clusters = label(Data, structure=structure)
+        # Lit les données et construit la liste de clusters pour TOUTES les fenêtres temporelles
+        data_df = read(file)
+        total_time = float(data_df.iloc[:, 1].max())
+        # Durée de fenêtre par défaut (même règle que dans compteur_particles)
+        d_time = total_time / 100.0
 
-        # Si aucun cluster détecté, on passe au fichier suivant
-        if num_clusters == 0:
-            print(f"Fichier {file}: aucun cluster détecté, skipped.")
+        clusters_list = []  # chaque élément: dict {mask, t, bbox, pixels}
+        t = 0.0
+        while t < total_time:
+            # récupère les images pour la fenêtre temporelle [t, t+d_time)
+            image = compteur_particles(file=data_df, t=t, d_time=d_time, plot=False, images_debug=True)
+            labeled_matrix, num_clusters = label(image, structure=structure)
+            if num_clusters > 0:
+                for i in range(1, num_clusters + 1):
+                    # ensure mask is an independent copy so later modifications
+                    # or reuse of labeled_matrix won't change stored masks
+                    mask = (labeled_matrix == i).copy()
+                    total = int(mask.sum())
+                    if total == 0:
+                        continue
+                    rows, cols = np.where(mask)
+                    pad = 5
+                    r0 = max(0, rows.min() - pad)
+                    r1 = min(mask.shape[0], rows.max() + pad + 1)
+                    c0 = max(0, cols.min() - pad)
+                    c1 = min(mask.shape[1], cols.max() + pad + 1)
+                    clusters_list.append({
+                        'mask': mask,
+                        't': float(t),
+                        'bbox': (r0, r1, c0, c1),
+                        'pixels': total
+                    })
+            t += d_time
+
+        if not clusters_list:
+            print(f"Fichier {file}: aucun cluster détecté sur toutes les fenêtres temporelles, skipped.")
             continue
 
         # Compteurs et état (ajout distinction muon/electron)
         counters = {"alpha": 0, "muon": 0, "electron": 0, "gamma": 0, "other": 0}
-        cluster_index = [1]
+        cluster_index = [1]  # index 1-based dans clusters_list
+        total_clusters = len(clusters_list)
 
         # Création de la figure/axes pour afficher les clusters et les boutons
         fig, ax_im = plt.subplots(figsize=(6, 6))
         plt.subplots_adjust(bottom=0.25)
-        img_display = ax_im.imshow(np.zeros((10, 10)), cmap='gray')
-        ax_im.axis('off')
-        title = fig.suptitle(f"Fichier: {Path(file).name} — Cluster {cluster_index[0]}/{num_clusters}")
+        # Colormap: background white, lit pixels dark gray
+        cmap_binary = ListedColormap(['#ffffff', '#444444'])
+        img_display = ax_im.imshow(np.zeros((10, 10)), cmap=cmap_binary, vmin=0, vmax=1, interpolation='nearest', origin='upper')
+        ax_im.set_facecolor('#ffffff')
+        # We'll use minor ticks to draw a light grid over pixels; hide major ticks
+        ax_im.set_xticks([])
+        ax_im.set_yticks([])
+        title = fig.suptitle(f"Fichier: {Path(file).name} — Cluster {cluster_index[0]}/{total_clusters}")
 
         # Axes des boutons (positions en pourcentage de la figure)
         ax_btn_alpha = plt.axes([0.05, 0.03, 0.18, 0.07])
@@ -123,24 +160,57 @@ if __name__ == "__main__":
 
         # Affiche le cluster d'index i (1-based)
         def show_cluster(i):
-            mask = (labeled_matrix == i)
-            total = int(mask.sum())
-            if total == 0:
-                display = np.zeros((10, 10), dtype=int)
-            else:
-                rows, cols = np.where(mask)
-                pad = 5
-                r0 = max(0, rows.min() - pad)
-                r1 = min(mask.shape[0], rows.max() + pad + 1)
-                c0 = max(0, cols.min() - pad)
-                c1 = min(mask.shape[1], cols.max() + pad + 1)
-                display = mask[r0:r1, c0:c1].astype(int)
-
+            # i is 1-based index into clusters_list
+            if i < 1 or i > total_clusters:
+                # Aucun cluster à afficher: on garde la fenêtre ouverte et affiche un message
+                img_display.set_data(np.zeros((10, 10)))
+                ax_im.set_title("No cluster to display")
+                title.set_text(f"Fichier: {Path(file).name} — Aucun cluster ({total_clusters}) — Appuyez sur Stop ou Choisir fichier")
+                fig.canvas.draw_idle()
+                return
+            info = clusters_list[i - 1]
+            mask = info['mask']
+            r0, r1, c0, c1 = info['bbox']
+            display = mask[r0:r1, c0:c1].astype(int)
+            # update grid for the displayed patch: put a tick at every pixel edge
+            # and make sure axis limits align exactly with pixel borders so the
+            # grid lines coincide with pixel edges (important when zooming or
+            # resizing the figure).
+            h, w = display.shape
+            # minor ticks at pixel boundaries (positions at -0.5, 0.5, 1.5, ...)
+            ax_im.set_xticks(np.arange(-0.5, w, 1), minor=True)
+            ax_im.set_yticks(np.arange(-0.5, h, 1), minor=True)
+            # align axis limits with pixel borders (imshow uses pixels centered at
+            # integer coords; borders are at +/-0.5). origin='upper' so invert y limits.
+            ax_im.set_xlim(-0.5, w - 0.5)
+            ax_im.set_ylim(h - 0.5, -0.5)
+            ax_im.set_aspect('equal')
+            ax_im.grid(which='minor', color='#dddddd', linestyle='-', linewidth=0.5)
+            # hide major ticks/labels but keep minor grid visible
+            ax_im.set_xticks([])
+            ax_im.set_yticks([])
+            ax_im.tick_params(which='major', bottom=False, left=False, labelbottom=False, labelleft=False)
+            pixels = info['pixels']
+            # Update the image shown and explicitly set its extent so pixel
+            # boundaries align exactly with the grid lines. This prevents half-
+            # pixel shifts when changing the image size and guarantees that one
+            # grid square corresponds to one image pixel.
             img_display.set_data(display)
-            img_display.set_cmap('gray')
+            # extent: left, right, bottom, top in data coords; using +-0.5
+            # positions aligns pixel centers at integer coordinates and borders
+            # at +-0.5
+            img_display.set_extent((-0.5, w - 0.5, h - 0.5, -0.5))
+            img_display.set_cmap(cmap_binary)
             img_display.set_clim(0, 1)
-            ax_im.set_title(f"Cluster {i}/{num_clusters} — pixels: {total}")
-            title.set_text(f"Fichier: {Path(file).name} — Cluster {i}/{num_clusters}")
+            img_display.set_interpolation('nearest')
+
+            # recompute counts on the mask and on the displayed patch to detect
+            # any mismatch (helps debugging intermittent count errors)
+            pixels = int(mask.sum())
+            displayed_pixels = int(np.count_nonzero(display))
+
+            ax_im.set_title(f"Cluster {i}/{total_clusters} — pixels total: {pixels} (in-view: {displayed_pixels}) — t={info['t']:.3f}s")
+            title.set_text(f"Fichier: {Path(file).name} — Cluster {i}/{total_clusters}")
             fig.canvas.draw_idle()
 
         # Fin de tri pour ce fichier: afficher récap et fermer la fenêtre
@@ -183,16 +253,17 @@ if __name__ == "__main__":
                     print("Fichier de comptage vide, rien à annuler.")
                     return
                 last = reader[-1]
-                # compute previous snapshot
+                # compute previous snapshot (the row before the last), if any
                 prev = reader[-2] if len(reader) > 1 else None
                 # remove last entry
                 remaining = reader[:-1]
-                fieldnames = ['timestamp', 'source_file', 'cluster', 'category', 'alpha', 'muon', 'electron', 'gamma', 'other']
+                # réécrit le CSV en gardant l'ordre canonique des colonnes
                 with open(comptage_path, 'w', newline='', encoding='utf-8') as f:
-                    writer = csv.DictWriter(f, fieldnames=fieldnames)
+                    writer = csv.DictWriter(f, fieldnames=CSV_FIELDNAMES)
                     writer.writeheader()
                     for row in remaining:
-                        writer.writerow(row)
+                        clean = {k: row.get(k, '') for k in CSV_FIELDNAMES}
+                        writer.writerow(clean)
 
                 # restore counters from prev or zeros
                 if prev:
@@ -201,11 +272,19 @@ if __name__ == "__main__":
                             counters[k] = int(prev.get(k, 0))
                         except Exception:
                             counters[k] = 0
-                    cluster_index[0] = int(prev.get('cluster', 0)) + 1 if prev.get('cluster') is not None else 1
                 else:
                     for k in ('alpha', 'muon', 'electron', 'gamma', 'other'):
                         counters[k] = 0
-                    cluster_index[0] = 1
+
+                # After removing the last entry, display the cluster that was
+                # removed (last). Example: if currently at cluster 3, the last
+                # saved row is for cluster 2; undo should remove row for 2 and
+                # re-display cluster 2.
+                try:
+                    last_cluster = int(last.get('cluster', 1))
+                except Exception:
+                    last_cluster = 1
+                cluster_index[0] = last_cluster
 
                 # Show the cluster that was undone
                 # last row contained cluster number before increment; after undo we want to show that cluster
@@ -236,6 +315,8 @@ if __name__ == "__main__":
 
         # Sauvegarde du comptage dans un fichier CSV situé au même endroit que le fichier source
         comptage_path = Path(file).with_name(f"{Path(file).stem}_comptage.csv")
+        # définit un jeu de colonnes canonique (utilisé partout pour écriture/lecture)
+        CSV_FIELDNAMES = ['timestamp', 'source_file', 'cluster', 'time', 'category', 'alpha', 'muon', 'electron', 'gamma', 'other']
 
         # Si demandé par l'utilisateur, supprimer le fichier de comptage existant pour recommencer
         if args.reset and comptage_path.exists():
@@ -246,22 +327,30 @@ if __name__ == "__main__":
                 print(f"Impossible de supprimer {comptage_path}: {e}")
 
         def save_count(cluster_num, category, counters_snapshot):
-            """Ajoute une ligne au fichier de comptage.
+            """Ajoute une ligne au fichier de comptage en utilisant DictWriter
 
-            Colonnes: timestamp, source_file, cluster, category, alpha, muon, electron, gamma, other
+            Colonnes: timestamp, source_file, cluster, time, category, alpha, muon, electron, gamma, other
             """
-            header = ['timestamp', 'source_file', 'cluster', 'category', 'alpha', 'muon', 'electron', 'gamma', 'other']
-            row = [datetime.utcnow().isoformat(), Path(file).name, int(cluster_num), category,
-                   counters_snapshot.get('alpha', 0), counters_snapshot.get('muon', 0),
-                   counters_snapshot.get('electron', 0), counters_snapshot.get('gamma', 0),
-                   counters_snapshot.get('other', 0)]
+            time_of_cluster = clusters_list[int(cluster_num) - 1]['t'] if 1 <= int(cluster_num) <= len(clusters_list) else ''
+            row = {
+                'timestamp': datetime.now(timezone.utc).isoformat(),
+                'source_file': Path(file).name,
+                'cluster': int(cluster_num),
+                'time': f"{time_of_cluster:.6f}",
+                'category': category,
+                'alpha': counters_snapshot.get('alpha', 0),
+                'muon': counters_snapshot.get('muon', 0),
+                'electron': counters_snapshot.get('electron', 0),
+                'gamma': counters_snapshot.get('gamma', 0),
+                'other': counters_snapshot.get('other', 0),
+            }
             try:
                 comptage_path.parent.mkdir(parents=True, exist_ok=True)
                 write_header = not comptage_path.exists()
                 with open(comptage_path, 'a', newline='', encoding='utf-8') as f:
-                    writer = csv.writer(f)
+                    writer = csv.DictWriter(f, fieldnames=CSV_FIELDNAMES)
                     if write_header:
-                        writer.writerow(header)
+                        writer.writeheader()
                     writer.writerow(row)
             except Exception as e:
                 print(f"Erreur sauvegarde comptage: {e}")
@@ -273,6 +362,7 @@ if __name__ == "__main__":
                     reader = csv.DictReader(f)
                     rows = list(reader)
                 if rows:
+                    # dernière entrée traitée
                     last = rows[-1]
                     try:
                         last_cluster = int(last.get('cluster', 0))
@@ -284,10 +374,10 @@ if __name__ == "__main__":
                             counters[k] = int(last.get(k, 0))
                         except Exception:
                             counters[k] = 0
-                    # Reprendre au cluster suivant
+                    # Reprendre au cluster suivant (global index)
                     cluster_index[0] = last_cluster + 1
-                    if cluster_index[0] > num_clusters:
-                        print(f"Fichier {file} : tous les clusters ({num_clusters}) ont déjà été triés selon {comptage_path.name}, skipped.")
+                    if cluster_index[0] > total_clusters:
+                        print(f"Fichier {file} : tous les clusters ({total_clusters}) ont déjà été triés selon {comptage_path.name}, skipped.")
                         plt.close('all')
                         continue
                     else:
@@ -298,12 +388,23 @@ if __name__ == "__main__":
         # Fabrica de callback pour incrémenter et avancer
         def make_callback(category):
             def _cb(event):
+                # ignore presses if already past the end
+                if cluster_index[0] > total_clusters:
+                    # already finished for this file; keep window open until Stop
+                    title.set_text(f"Fichier: {Path(file).name} — FINI ({total_clusters} clusters triés). Appuyez sur Stop ou Choisir fichier.")
+                    return
                 current_cluster = int(cluster_index[0])
                 counters[category] += 1
                 save_count(current_cluster, category, counters)
                 cluster_index[0] += 1
-                if cluster_index[0] > num_clusters:
-                    finish()
+                # si on a dépassé la fin, n'appeler pas finish() — on garde la fenêtre ouverte
+                if cluster_index[0] > total_clusters:
+                    # afficher message de fin mais ne pas fermer
+                    img_display.set_data(np.zeros((10, 10)))
+                    title.set_text(f"Fichier: {Path(file).name} — FINI ({total_clusters} clusters triés). Appuyez sur Stop ou Choisir fichier.")
+                    ax_im.set_title("Aucun cluster restant")
+                    fig.canvas.draw_idle()
+                    return
                 else:
                     show_cluster(cluster_index[0])
             return _cb
