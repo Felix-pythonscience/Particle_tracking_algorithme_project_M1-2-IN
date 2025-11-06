@@ -241,53 +241,41 @@ if __name__ == "__main__":
                 print(f"Fichier choisi: {selected}")
                 plt.close(fig)
 
-        # Callback undo: enlève la dernière entrée du CSV et restaure les compteurs et l'index
+        # Callback undo: enlève la dernière entrée du fichier .npy et restaure les compteurs et l'index
         def undo_cb(event):
             if not comptage_path.exists():
                 print("Aucun fichier de comptage pour annuler.")
                 return
             try:
-                with open(comptage_path, 'r', encoding='utf-8') as f:
-                    reader = list(csv.DictReader(f))
-                if not reader:
-                    print("Fichier de comptage vide, rien à annuler.")
+                arr = list(np.load(comptage_path, allow_pickle=True))
+                # arr[0]=explanation, arr[1]=counters, arr[2:]=cluster entries
+                if len(arr) <= 2:
+                    print("Aucun enregistrement de cluster à annuler.")
                     return
-                last = reader[-1]
-                # compute previous snapshot (the row before the last), if any
-                prev = reader[-2] if len(reader) > 1 else None
-                # remove last entry
-                remaining = reader[:-1]
-                # réécrit le CSV en gardant l'ordre canonique des colonnes
-                with open(comptage_path, 'w', newline='', encoding='utf-8') as f:
-                    writer = csv.DictWriter(f, fieldnames=CSV_FIELDNAMES)
-                    writer.writeheader()
-                    for row in remaining:
-                        clean = {k: row.get(k, '') for k in CSV_FIELDNAMES}
-                        writer.writerow(clean)
+                last = arr.pop()  # removed cluster entry (dict)
 
-                # restore counters from prev or zeros
-                if prev:
+                # restore counters from arr[1] (snapshot after previous saved row) or zeros
+                if len(arr) > 1 and isinstance(arr[1], dict):
+                    prev_counters = arr[1]
                     for k in ('alpha', 'muon', 'electron', 'gamma', 'other'):
                         try:
-                            counters[k] = int(prev.get(k, 0))
+                            counters[k] = int(prev_counters.get(k, 0))
                         except Exception:
                             counters[k] = 0
                 else:
                     for k in ('alpha', 'muon', 'electron', 'gamma', 'other'):
                         counters[k] = 0
 
-                # After removing the last entry, display the cluster that was
-                # removed (last). Example: if currently at cluster 3, the last
-                # saved row is for cluster 2; undo should remove row for 2 and
-                # re-display cluster 2.
+                # write back the trimmed array
+                np.save(comptage_path, np.array(arr, dtype=object), allow_pickle=True)
+
+                # After removing the last entry, display the cluster that was removed
                 try:
                     last_cluster = int(last.get('cluster', 1))
                 except Exception:
                     last_cluster = 1
                 cluster_index[0] = last_cluster
 
-                # Show the cluster that was undone
-                # last row contained cluster number before increment; after undo we want to show that cluster
                 try:
                     show_cluster(cluster_index[0])
                 except Exception:
@@ -313,75 +301,84 @@ if __name__ == "__main__":
                 pass
             print("Réinitialisation des compteurs pour ce fichier.")
 
-        # Sauvegarde du comptage dans un fichier CSV situé au même endroit que le fichier source
-        comptage_path = Path(file).with_name(f"{Path(file).stem}_comptage.csv")
-        # définit un jeu de colonnes canonique (utilisé partout pour écriture/lecture)
-        CSV_FIELDNAMES = ['timestamp', 'source_file', 'cluster', 'time', 'category', 'alpha', 'muon', 'electron', 'gamma', 'other']
+        # Sauvegarde du comptage dans un fichier binaire numpy (.npy) situé au même endroit que le fichier source
+        comptage_path = Path(file).with_name(f"{Path(file).stem}_comptage.npy")
+        EXPLANATION = (
+            "FORMAT: [0]=explanation(str), [1]=counters(dict), [2:]=cluster entries(dict with keys 'cluster','category','pixels'(Nx2 np.int_), 'source_file')"
+        )
 
-        # Si demandé par l'utilisateur, supprimer le fichier de comptage existant pour recommencer
-        if args.reset and comptage_path.exists():
-            try:
-                os.remove(comptage_path)
-                print(f"Fichier de comptage supprimé (reset): {comptage_path}")
-            except Exception as e:
-                print(f"Impossible de supprimer {comptage_path}: {e}")
+       
 
         def save_count(cluster_num, category, counters_snapshot):
-            """Ajoute une ligne au fichier de comptage en utilisant DictWriter
+            """Ajoute une entrée au fichier .npy :
 
-            Colonnes: timestamp, source_file, cluster, time, category, alpha, muon, electron, gamma, other
+            - arr[0] : explanation (str)
+            - arr[1] : counters snapshot (dict)
+            - arr[2:] : cluster entries (dict)
+            Each cluster entry: {'cluster': int, 'category': str, 'pixels': np.ndarray (N,2), 'time': float, 'source_file': str}
             """
-            time_of_cluster = clusters_list[int(cluster_num) - 1]['t'] if 1 <= int(cluster_num) <= len(clusters_list) else ''
-            row = {
-                'timestamp': datetime.now(timezone.utc).isoformat(),
-                'source_file': Path(file).name,
+            # pixels as list of (row, col)
+            try:
+                mask = clusters_list[int(cluster_num) - 1]['mask']
+                pixels_coords = np.column_stack(np.where(mask)).astype(np.int_)
+            except Exception:
+                pixels_coords = np.zeros((0, 2), dtype=np.int_)
+
+            entry = {
                 'cluster': int(cluster_num),
-                'time': f"{time_of_cluster:.6f}",
                 'category': category,
-                'alpha': counters_snapshot.get('alpha', 0),
-                'muon': counters_snapshot.get('muon', 0),
-                'electron': counters_snapshot.get('electron', 0),
-                'gamma': counters_snapshot.get('gamma', 0),
-                'other': counters_snapshot.get('other', 0),
+                'pixels': pixels_coords,
+                'source_file': Path(file).name,
             }
+
             try:
                 comptage_path.parent.mkdir(parents=True, exist_ok=True)
-                write_header = not comptage_path.exists()
-                with open(comptage_path, 'a', newline='', encoding='utf-8') as f:
-                    writer = csv.DictWriter(f, fieldnames=CSV_FIELDNAMES)
-                    if write_header:
-                        writer.writeheader()
-                    writer.writerow(row)
+                if comptage_path.exists():
+                    arr = list(np.load(comptage_path, allow_pickle=True))
+                else:
+                    # initialize array: explanation + counters snapshot
+                    arr = [EXPLANATION, {k: counters_snapshot.get(k, 0) for k in ('alpha', 'muon', 'electron', 'gamma', 'other')}]
+
+                # append entry and update counters snapshot
+                arr.append(entry)
+                arr[1] = {k: counters_snapshot.get(k, 0) for k in ('alpha', 'muon', 'electron', 'gamma', 'other')}
+
+                np.save(comptage_path, np.array(arr, dtype=object), allow_pickle=True)
             except Exception as e:
-                print(f"Erreur sauvegarde comptage: {e}")
+                print(f"Erreur sauvegarde comptage (.npy): {e}")
 
         # Si le fichier de comptage existe déjà et que l'option resume est activée, on peut reprendre
         if args.resume and comptage_path.exists():
             try:
-                with open(comptage_path, 'r', encoding='utf-8') as f:
-                    reader = csv.DictReader(f)
-                    rows = list(reader)
-                if rows:
-                    # dernière entrée traitée
-                    last = rows[-1]
-                    try:
-                        last_cluster = int(last.get('cluster', 0))
-                    except Exception:
-                        last_cluster = 0
-                    # Restaurer les compteurs à partir de la dernière ligne
+                arr = list(np.load(comptage_path, allow_pickle=True))
+                # arr[0]=explanation, arr[1]=counters snapshot, arr[2:]=entries
+                if len(arr) > 1 and isinstance(arr[1], dict):
+                    last_counters = arr[1]
                     for k in ('alpha', 'muon', 'electron', 'gamma', 'other'):
                         try:
-                            counters[k] = int(last.get(k, 0))
+                            counters[k] = int(last_counters.get(k, 0))
                         except Exception:
                             counters[k] = 0
-                    # Reprendre au cluster suivant (global index)
-                    cluster_index[0] = last_cluster + 1
-                    if cluster_index[0] > total_clusters:
-                        print(f"Fichier {file} : tous les clusters ({total_clusters}) ont déjà été triés selon {comptage_path.name}, skipped.")
-                        plt.close('all')
-                        continue
-                    else:
-                        print(f"Reprise du tri pour {Path(file).name} à partir du cluster {cluster_index[0]} (dernière entrée: cluster {last_cluster})")
+                else:
+                    for k in ('alpha', 'muon', 'electron', 'gamma', 'other'):
+                        counters[k] = 0
+
+                if len(arr) > 2:
+                    try:
+                        last_cluster = int(arr[-1].get('cluster', 0))
+                    except Exception:
+                        last_cluster = 0
+                else:
+                    last_cluster = 0
+
+                # Reprendre au cluster suivant (global index)
+                cluster_index[0] = last_cluster + 1
+                if cluster_index[0] > total_clusters:
+                    print(f"Fichier {file} : tous les clusters ({total_clusters}) ont déjà été triés selon {comptage_path.name}, skipped.")
+                    plt.close('all')
+                    continue
+                else:
+                    print(f"Reprise du tri pour {Path(file).name} à partir du cluster {cluster_index[0]} (dernière entrée: cluster {last_cluster})")
             except Exception as e:
                 print(f"Erreur lors de la lecture du fichier de reprise {comptage_path}: {e}")
 
