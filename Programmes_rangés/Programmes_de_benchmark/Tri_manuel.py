@@ -1,4 +1,3 @@
-import time  # pour mesurer les durées d'exécution
 from pathlib import Path  # gestion de chemins OS-indépendants
 import sys  # manipulation du sys.path pour importer depuis le repo
 import numpy as np  # calcul numérique
@@ -7,7 +6,6 @@ from scipy.ndimage import label, sum as ndi_sum
 from matplotlib.widgets import Button
 from matplotlib.colors import ListedColormap
 from datetime import datetime, timezone
-import csv
 import argparse
 import os
 import tkinter as tk
@@ -155,7 +153,7 @@ if __name__ == "__main__":
         btn_other = Button(ax_btn_other, 'Other (o)')
         btn_choose = Button(ax_btn_choose, 'Choose file')
         btn_undo = Button(ax_btn_undo, 'Undo (u)')
-        btn_reset = Button(ax_btn_reset, 'Reset (r)')
+        btn_reset = Button(ax_btn_reset, 'Reset')
         btn_stop = Button(ax_btn_stop, 'Stop (s)')
 
         # Affiche le cluster d'index i (1-based)
@@ -434,8 +432,6 @@ if __name__ == "__main__":
                 make_callback('other')(event)
             elif key == 'u':
                 undo_cb(event)
-            elif key == 'r':
-                reset_cb(event)
             elif key == 's':
                 stop_cb(event)
 
