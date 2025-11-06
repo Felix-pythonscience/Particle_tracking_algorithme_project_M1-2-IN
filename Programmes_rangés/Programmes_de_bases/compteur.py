@@ -1,6 +1,9 @@
 import numpy as np
 from scipy.ndimage import label
 from pathlib import Path
+import sys
+parent_dir = Path(__file__).resolve().parent.parent
+sys.path.append(str(parent_dir))
 try:
     # allow running as part of a package (preferred)
     from .read_file import read, slice, slice_Tot
