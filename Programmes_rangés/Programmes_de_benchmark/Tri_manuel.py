@@ -84,7 +84,7 @@ if __name__ == "__main__":
         data_df = read(file)
         total_time = float(data_df.iloc[:, 1].max())
         # Durée de fenêtre par défaut (même règle que dans compteur_particles)
-        d_time = total_time / 100.0
+        d_time = total_time / 500.0
 
         clusters_list = []  # chaque élément: dict {mask, t, bbox, pixels}
         t = 0.0
