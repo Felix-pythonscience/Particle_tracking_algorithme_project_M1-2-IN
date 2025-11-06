@@ -120,6 +120,8 @@ if __name__ == "__main__":
 
         # Compteurs et état (ajout distinction muon/electron)
         counters = {"alpha": 0, "muon": 0, "electron": 0, "gamma": 0, "other": 0}
+        # counts collected for the current cluster before committing with space
+        pending_counts = {k: 0 for k in counters}
         cluster_index = [1]  # index 1-based dans clusters_list
         total_clusters = len(clusters_list)
 
@@ -307,13 +309,11 @@ if __name__ == "__main__":
 
        
 
-        def save_count(cluster_num, category, counters_snapshot):
-            """Ajoute une entrée au fichier .npy :
+        def save_count(cluster_num, pending_counts_snapshot, counters_snapshot):
+            """Commit current cluster: store counts per cluster and pixels into .npy
 
-            - arr[0] : explanation (str)
-            - arr[1] : counters snapshot (dict)
-            - arr[2:] : cluster entries (dict)
-            Each cluster entry: {'cluster': int, 'category': str, 'pixels': np.ndarray (N,2), 'time': float, 'source_file': str}
+            arr[0]=explanation, arr[1]=counters snapshot, arr[2:]=cluster entries
+            each cluster entry: {'cluster':int,'counts':dict,'pixels':np.ndarray(N,2),'source_file':str}
             """
             # pixels as list of (row, col)
             try:
@@ -324,7 +324,7 @@ if __name__ == "__main__":
 
             entry = {
                 'cluster': int(cluster_num),
-                'category': category,
+                'counts': {k: int(pending_counts_snapshot.get(k, 0)) for k in pending_counts_snapshot},
                 'pixels': pixels_coords,
                 'source_file': Path(file).name,
             }
@@ -380,35 +380,47 @@ if __name__ == "__main__":
             except Exception as e:
                 print(f"Erreur lors de la lecture du fichier de reprise {comptage_path}: {e}")
 
-        # Fabrica de callback pour incrémenter et avancer
-        def make_callback(category):
-            def _cb(event):
-                # ignore presses if already past the end
-                if cluster_index[0] > total_clusters:
-                    # already finished for this file; keep window open until Stop
-                    title.set_text(f"Fichier: {Path(file).name} — FINI ({total_clusters} clusters triés). Appuyez sur Stop ou Choisir fichier.")
-                    return
-                current_cluster = int(cluster_index[0])
-                counters[category] += 1
-                save_count(current_cluster, category, counters)
-                cluster_index[0] += 1
-                # si on a dépassé la fin, n'appeler pas finish() — on garde la fenêtre ouverte
-                if cluster_index[0] > total_clusters:
-                    # afficher message de fin mais ne pas fermer
-                    img_display.set_data(np.zeros((10, 10)))
-                    title.set_text(f"Fichier: {Path(file).name} — FINI ({total_clusters} clusters triés). Appuyez sur Stop ou Choisir fichier.")
-                    ax_im.set_title("Aucun cluster restant")
-                    fig.canvas.draw_idle()
-                    return
-                else:
-                    show_cluster(cluster_index[0])
-            return _cb
+        # Callbacks: increment pending_counts per category (buttons and keys)
+        def incr_category(category):
+            # increment pending count for current cluster and update title
+            pending_counts[category] += 1
+            pending_str = f"pending a={pending_counts['alpha']} e={pending_counts['electron']} m={pending_counts['muon']} g={pending_counts['gamma']} o={pending_counts['other']}"
+            title.set_text(f"Fichier: {Path(file).name} — Cluster {cluster_index[0]}/{total_clusters} — {pending_str}")
+            fig.canvas.draw_idle()
 
-        btn_alpha.on_clicked(make_callback('alpha'))
-        btn_muon.on_clicked(make_callback('muon'))
-        btn_electron.on_clicked(make_callback('electron'))
-        btn_gamma.on_clicked(make_callback('gamma'))
-        btn_other.on_clicked(make_callback('other'))
+        def commit_cluster_and_advance():
+            # commit current pending_counts for the current cluster and advance
+            if cluster_index[0] > total_clusters:
+                title.set_text(f"Fichier: {Path(file).name} — FINI ({total_clusters} clusters triés). Appuyez sur Stop ou Choisir fichier.")
+                return
+            current_cluster = int(cluster_index[0])
+            # update global counters by adding pending_counts
+            for k in pending_counts:
+                try:
+                    counters[k] += int(pending_counts.get(k, 0))
+                except Exception:
+                    pass
+            # save
+            save_count(current_cluster, pending_counts, counters)
+            # reset pending counts
+            for k in pending_counts:
+                pending_counts[k] = 0
+            # advance
+            cluster_index[0] += 1
+            if cluster_index[0] > total_clusters:
+                img_display.set_data(np.zeros((10, 10)))
+                title.set_text(f"Fichier: {Path(file).name} — FINI ({total_clusters} clusters triés). Appuyez sur Stop ou Choisir fichier.")
+                ax_im.set_title("Aucun cluster restant")
+                fig.canvas.draw_idle()
+                return
+            else:
+                show_cluster(cluster_index[0])
+
+        btn_alpha.on_clicked(lambda ev: incr_category('alpha'))
+        btn_muon.on_clicked(lambda ev: incr_category('muon'))
+        btn_electron.on_clicked(lambda ev: incr_category('electron'))
+        btn_gamma.on_clicked(lambda ev: incr_category('gamma'))
+        btn_other.on_clicked(lambda ev: incr_category('other'))
         btn_choose.on_clicked(choose_cb)
         btn_undo.on_clicked(undo_cb)
         btn_reset.on_clicked(reset_cb)
@@ -421,15 +433,18 @@ if __name__ == "__main__":
                 return
             key = key.lower()
             if key == 'a':
-                make_callback('alpha')(event)
+                incr_category('alpha')
             elif key == 'm':
-                make_callback('muon')(event)
+                incr_category('muon')
             elif key == 'e':
-                make_callback('electron')(event)
+                incr_category('electron')
             elif key == 'g':
-                make_callback('gamma')(event)
+                incr_category('gamma')
             elif key == 'o':
-                make_callback('other')(event)
+                incr_category('other')
+            elif key == ' ' or key == 'space':
+                # commit pending counts for this cluster and advance
+                commit_cluster_and_advance()
             elif key == 'u':
                 undo_cb(event)
             elif key == 's':
