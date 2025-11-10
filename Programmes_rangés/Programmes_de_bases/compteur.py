@@ -73,8 +73,6 @@ def compteur_particles(file = "None", t= 0, d_time = None, plot = False, block =
 
     N_alpha = event_counting_alpha(image_alpha)
 
-
-
     N_electrons , N_muons, N_alpha_corr = event_counting_electron_muon(image_tracks)
     N_alpha += N_alpha_corr
     N_gamma = event_counting_photon(image_gamma)
