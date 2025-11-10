@@ -14,7 +14,7 @@ from skimage.measure import regionprops
 def event_counting_alpha(alpha_matrix, plot_result=True) :
 
     # Si matrice vide -> problème
-    if np.sum(alpha_matrix) == 0:
+    if not np.any(alpha_matrix):
         return 0
 
     # Labelise et compte le nombre de cluster trouvé sans critere de chevauchement 
@@ -60,7 +60,7 @@ def event_counting_electron_muon(electron_muon_matrix, plot_result=True) :
 
     # Si matrice vide -> problème
     if not np.any(electron_muon_matrix):
-        return 0
+        return 0,0,0
     
     # Critère discri 
     eccentricity_threshold = 0.99
@@ -111,6 +111,10 @@ def event_counting_electron_muon(electron_muon_matrix, plot_result=True) :
 #%% Fonction de comptage photons
 
 def event_counting_photon(photon_matrix) :
+    
+    # Si matrice vide -> problème
+    if not np.any(photon_matrix):
+        return 0    
     
     structure = np.ones((3, 3), dtype=int)
     labeled_matrix, photon_count = label(photon_matrix, structure=structure)
