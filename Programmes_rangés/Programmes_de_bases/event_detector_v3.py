@@ -11,7 +11,7 @@ import matplotlib.pyplot as plt
 from skimage.measure import regionprops
 
 
-def event_counting_alpha(alpha_matrix, plot_result=True) :
+def event_counting_alpha(alpha_matrix, plot_result=False) :
 
     # Si matrice vide -> problème
     if np.sum(alpha_matrix) == 0:
@@ -56,11 +56,11 @@ def event_counting_alpha(alpha_matrix, plot_result=True) :
 
 #%% Fonction de comptage beta/muons/
 
-def event_counting_electron_muon(electron_muon_matrix, plot_result=True) :
+def event_counting_electron_muon(electron_muon_matrix, plot_result=False) :
 
     # Si matrice vide -> problème
     if not np.any(electron_muon_matrix):
-        return 0
+        return 0,0,0
     
     # Critère discri 
     eccentricity_threshold = 0.99

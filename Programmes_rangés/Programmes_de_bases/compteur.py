@@ -1,5 +1,4 @@
 import numpy as np
-from scipy.ndimage import label
 from pathlib import Path
 import sys
 parent_dir = Path(__file__).resolve().parent.parent
@@ -23,7 +22,7 @@ except Exception:
    
 
 
-def compteur_particles(file = "None", t= 0, d_time = None, plot = False, block = False, save = [False,"plot_results.png",Path.cwd()], images_debug=False):
+def compteur_particles(file = "None", t= 0, d_time = None, plot = False, block = False, save = [False,"plot_results.png",Path.cwd()], images_debug=False,slice = False):
     """Count particle types in a time window and optionally plot the results.
 
     This function reads the data (or accepts an already-loaded DataFrame/array),
@@ -37,9 +36,9 @@ def compteur_particles(file = "None", t= 0, d_time = None, plot = False, block =
         Path to the input file or an already loaded DataFrame/array. When a string
         is passed it will be read with `read()`.
     t : float, optional
-        Start time of the analysis window (currently unused; kept for API parity).
+        Start time of the analysis window .
     d_time : float, optional
-        Duration of the time window. If None, defaults to max(time)/100.
+        Duration of the time window. If None, defaults to 50.
     plot : bool, optional
         If True, display diagnostic plots using `plot_results`.
     save : list, optional
@@ -48,15 +47,20 @@ def compteur_particles(file = "None", t= 0, d_time = None, plot = False, block =
         is the path where the results should be saved.
     images_debug : bool, optional
         If True, return the intermediate images for or things.
+    slice : bool, optional
+        If True, the input data should be a sliced image (ie the resulte of the slice data).
     Returns
     -------
     tuple
         (N_alpha, N_tracks, N_gamma) counts of connected components for each class.
     """
-    data = file if not(type(file) == str) else read(file)
-    d_time = d_time if d_time!=None else max(data.iloc[:, 1]) / 100  # Diviser le temps
+    if slice:
+        image = file
+    else:
+        data = file if not(type(file) == str) else read(file)
+        d_time = d_time if d_time!=None else 50  # Diviser le temps
 
-    image = slice(data.to_numpy(), t, d_time)
+        image = slice(data.to_numpy(), t, d_time)
     if images_debug:
         return image
     image_without_alpha, image_alpha = filtre_alpha(image)# Appliquer le filtre pour enlever les tracks
