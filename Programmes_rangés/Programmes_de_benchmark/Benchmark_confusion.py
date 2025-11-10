@@ -52,7 +52,6 @@ def get_current_memory_usage_mib():
     # Convertit en MegaBytes (MiB)
     return rss_bytes / (1024 * 1024)
 
-print(f"Mémoire de départ : {get_current_memory_usage_mib():.2f} MiB")
 
 if __name__ == "__main__":
     cluster_files =[np.load(i,allow_pickle=True) for i in list_npy_files("C:/Users/Félix/Desktop/Programmation/Projet_cea/Particle_tracking_algorithme_project_M1-2-IN/DATA-20251022T080148Z-1-001/DATA/Combined_Am_SrY/2.5cm", recursive=False)]
@@ -69,12 +68,11 @@ if __name__ == "__main__":
     N_muon_algo = 0
 
 
-    print("HAHAHAHAHAH")
     for clusters in cluster_files:
     
         for i,cluster in enumerate(clusters[2:]):
-            print(f"cluster {i}/{len(clusters)-2}")
-            print(f"Mémoire utilisée : {get_current_memory_usage_mib():.2f} MiB")
+            print(f"cluster {i}/{len(clusters)-2}", end='\r', flush=True)
+    
             #Traitement des vraies valeurs
             N_alpha_true += cluster["counts"]["alpha"]
             N_electron_true += cluster["counts"]["electron"]
@@ -90,19 +88,47 @@ if __name__ == "__main__":
             N_gamma_algo += N_gamma_algo_i
             N_muon_algo += N_muon_algo_i    
             
+    print("\nRÉSULTATS DE LA CONFUSION :")
+    # Relative errors (algo - truth) / truth, expressed both as counts and percent
+    def rel_err(algo, truth):
+        try:
+            if truth == 0:
+                return None
+            return (algo - truth) / truth
+        except Exception:
+            return None
 
-    print("VRAIES VALEURS :")
-    print(f"Nombre de particules alpha détectées : {N_alpha_true}")     
-    print(f"Nombre de particules électrons détectées : {N_electron_true}")
-    print(f"Nombre de particules muons détectées : {N_muon_true}")
-    print(f"Nombre de particules gamma détectées : {N_gamma_true}")
-    print(f"Nombre de particules autres détectées : {N_other_true}")
+    print('\nERREURS RELATIVES :')
+    items = [
+        ('Alpha', N_alpha_algo, N_alpha_true),
+        ('Electrons', N_electron_algo, N_electron_true),
+        ('Muons', N_muon_algo, N_muon_true),
+        ('Gamma', N_gamma_algo, N_gamma_true),
+    ]
 
-    print(f"Nombre total de particules détectées : {N_alpha_true + N_electron_true + N_muon_true + N_gamma_true + N_other_true}")
-    print("\n")
-    print("VALEURS ALGORITHMIQUES :")
-    print(f"Nombre de particules alpha détectées : {N_alpha_algo}")     
-    print(f"Nombre de particules électrons détectées : {N_electron_algo}")
-    print(f"Nombre de particules muons détectées : {N_muon_algo}")
-    print(f"Nombre de particules gamma détectées : {N_gamma_algo}")
-    print(f"Nombre total de particules détectées : {N_alpha_algo + N_electron_algo + N_muon_algo + N_gamma_algo}")
+    total_true = N_alpha_true + N_electron_true + N_muon_true + N_gamma_true
+    total_algo = N_alpha_algo + N_electron_algo + N_muon_algo + N_gamma_algo
+
+    for name, a, t in items:
+        r = rel_err(a, t)
+        if r is None:
+            if t == 0 and a == 0:
+                print(f"{name}: truth=0, algo=0 → relative error: 0.00 (0%)")
+            elif t == 0:
+                print(f"{name}: truth=0, algo={a} → relative error: undefined (division by zero)")
+            else:
+                print(f"{name}: relative error unavailable")
+        else:
+            print(f"{name}: algo={a}, truth={t}, rel_err={r:.4f} ({abs(r)*100:.2f}%)")
+
+    # Totals
+    r_tot = rel_err(total_algo, total_true)
+    if r_tot is None:
+        if total_true == 0 and total_algo == 0:
+            print(f"Total: truth=0, algo=0 → relative error: 0.00 (0%)")
+        elif total_true == 0:
+            print(f"Total: truth=0, algo={total_algo} → relative error: undefined (division by zero)")
+    else:
+        print(f"Total: algo={total_algo}, truth={total_true}, rel_err={r_tot:.4f} ({r_tot*100:.2f}%)")
+
+    

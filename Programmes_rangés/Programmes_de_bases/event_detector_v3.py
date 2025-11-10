@@ -64,7 +64,7 @@ def event_counting_electron_muon(electron_muon_matrix, plot_result=False) :
     
     # Critère discri 
     eccentricity_threshold = 0.99
-    solidity_threshold = 0.99
+    solidity_threshold = 0.75
     area_threshold = 10
     
     # Labelise et compte le nombre de cluster trouvé
