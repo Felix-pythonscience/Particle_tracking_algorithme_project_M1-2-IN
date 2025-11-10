@@ -55,7 +55,7 @@ def get_current_memory_usage_mib():
 print(f"Mémoire de départ : {get_current_memory_usage_mib():.2f} MiB")
 
 if __name__ == "__main__":
-    cluster_files =[np.load(i,allow_pickle=True) for i in list_npy_files("C:/Users/Graziani/Desktop/Projet_CEA/Projet/Particle_tracking_algorithme_project_M1-2-IN/DATA-20251022T080148Z-1-001/DATA/Combined_Am_SrY/2.5cm", recursive=False)]
+    cluster_files =[np.load(i,allow_pickle=True) for i in list_npy_files("C:/Users/Félix/Desktop/Programmation/Projet_cea/Particle_tracking_algorithme_project_M1-2-IN/DATA-20251022T080148Z-1-001/DATA/Combined_Am_SrY/2.5cm", recursive=False)]
 
     N_alpha_true = 0
     N_electron_true = 0
@@ -83,7 +83,8 @@ if __name__ == "__main__":
             N_other_true += cluster["counts"]["other"]
 
             #Traitement des valeurs algorithmiques
-            N_alpha_algo_i,N_electron_algo_i,N_gamma_algo_i,N_muon_algo_i = compteur_particles(image_maker(cluster["pixels"]),slice=True)
+            counts = compteur_particles(image_maker(cluster["pixels"]),is_slice=True)["Counts"]
+            N_alpha_algo_i,N_electron_algo_i,N_muon_algo_i,N_gamma_algo_i = counts["alpha"],counts["electrons"],counts["muons"],counts["gamma"]
             N_alpha_algo += N_alpha_algo_i
             N_electron_algo += N_electron_algo_i
             N_gamma_algo += N_gamma_algo_i
@@ -94,13 +95,14 @@ if __name__ == "__main__":
     print(f"Nombre de particules alpha détectées : {N_alpha_true}")     
     print(f"Nombre de particules électrons détectées : {N_electron_true}")
     print(f"Nombre de particules muons détectées : {N_muon_true}")
-
     print(f"Nombre de particules gamma détectées : {N_gamma_true}")
     print(f"Nombre de particules autres détectées : {N_other_true}")
+
+    print(f"Nombre total de particules détectées : {N_alpha_true + N_electron_true + N_muon_true + N_gamma_true + N_other_true}")
     print("\n")
     print("VALEURS ALGORITHMIQUES :")
     print(f"Nombre de particules alpha détectées : {N_alpha_algo}")     
     print(f"Nombre de particules électrons détectées : {N_electron_algo}")
     print(f"Nombre de particules muons détectées : {N_muon_algo}")
     print(f"Nombre de particules gamma détectées : {N_gamma_algo}")
-
+    print(f"Nombre total de particules détectées : {N_alpha_algo + N_electron_algo + N_muon_algo + N_gamma_algo}")

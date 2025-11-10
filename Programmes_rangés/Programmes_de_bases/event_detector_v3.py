@@ -88,11 +88,11 @@ def event_counting_electron_muon(electron_muon_matrix, plot_result=False) :
         if is_muon:
             muon_count += 1
             classification_matrix[labeled_matrix == props.label] = 2
-            print("muon", props.eccentricity)
+            #print("muon", props.eccentricity)
         elif is_alpha:
             alpha_count += 1
             classification_matrix[labeled_matrix == props.label] = 1
-            print("alpha", props.solidity)
+            #print("alpha", props.solidity)
         else:
             electron_count += 1
             classification_matrix[labeled_matrix == props.label] = 3

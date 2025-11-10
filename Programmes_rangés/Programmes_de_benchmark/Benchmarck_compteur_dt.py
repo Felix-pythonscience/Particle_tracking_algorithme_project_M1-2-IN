@@ -116,14 +116,14 @@ for file in [files[0]]:
             # Affiche une progression sur la même ligne
             print(f" Traitement du temps {t+1}/{x[i]}", end='\r', flush=True)
             # Appel de la fonction de comptage sur la tranche courante
-            
-            N_alpha_dt, N_electrons_dt, N_muons_dt, N_gamma_dt = compteur_particles(
+            counts = compteur_particles(
                 file=data,  # on passe l'objet DataFrame directement pour éviter une relecture disque
                 t=t * dt,  # temps de départ de la tranche
                 d_time=dt,  # durée de la tranche
                 save=[True if t == 0 else False,  # sauvegarde seulement pour la première tranche
                       Path(f"dt = 1 divisé par {str(x[i]).zfill(4)}"),
-                      script_dir / "Benchmark_Results" / "compteur5" / "Evolution_détections_en_fonction_de_dt"])
+                      script_dir / "Benchmark_Results" / "compteur5" / "Evolution_détections_en_fonction_de_dt"])["Counts"]
+            N_alpha_dt, N_electrons_dt, N_muons_dt, N_gamma_dt = counts["alpha"], counts["electrons"], counts["muons"], counts["gamma"]
             # Accumule les résultats
             N_alpha += N_alpha_dt
             N_electrons += N_electrons_dt

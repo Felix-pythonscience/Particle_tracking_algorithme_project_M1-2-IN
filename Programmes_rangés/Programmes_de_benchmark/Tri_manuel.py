@@ -84,13 +84,13 @@ if __name__ == "__main__":
         data_df = read(file)
         total_time = float(data_df.iloc[:, 1].max())
         # Durée de fenêtre par défaut (même règle que dans compteur_particles)
-        d_time = total_time / 500.0
-
+        d_time = 150000000
         clusters_list = []  # chaque élément: dict {mask, t, bbox, pixels}
         t = 0.0
+        time_start = datetime.now(timezone.utc)
         while t < total_time:
             # récupère les images pour la fenêtre temporelle [t, t+d_time)
-            image = compteur_particles(file=data_df, t=t, d_time=d_time, plot=False, images_debug=True)
+            image = compteur_particles(file=data_df, t=t, d_time=d_time, plot=False, return_images=True)["Images"]["original"]
             labeled_matrix, num_clusters = label(image, structure=structure)
             if num_clusters > 0:
                 for i in range(1, num_clusters + 1):
@@ -113,6 +113,8 @@ if __name__ == "__main__":
                         'pixels': total
                     })
             t += d_time
+            print(f"{t}/{total_time} s processed", end='\r', flush=True)
+        print("total time for cluster extraction:", (datetime.now(timezone.utc) - time_start).total_seconds(), "s")
 
         if not clusters_list:
             print(f"Fichier {file}: aucun cluster détecté sur toutes les fenêtres temporelles, skipped.")

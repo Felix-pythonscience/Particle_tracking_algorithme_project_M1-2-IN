@@ -60,6 +60,11 @@ def filtre_alpha(image):
     opened_list = [ouverture(binary, structure=structure_circulaire, anchor=anc) for anc in anchors]
     opened = np.maximum.reduce(opened_list).astype(np.uint8)
 
+    # Dilater légèrement le masque alpha pour regrouper/élargir les petites régions
+    # Utilise un élément structurant 3x3 (rectangle) pour une dilatation isotrope
+    kernel_3x3 = cv.getStructuringElement(cv.MORPH_RECT, (3, 3))
+    opened = cv.dilate(opened, kernel_3x3, iterations=1)
+
     # Appliquer le masque sur l'image originale (si image contient des comptes, on conserve les valeurs)
     image_alpha = image * opened
     image_without_alpha = image - image_alpha
@@ -82,7 +87,8 @@ def filtre_tracks(image):
     dil2 = cv.dilate(opened_horizontale, structure_verticale, iterations=1)
 
     mask = np.maximum(dil1, dil2).astype(np.uint8)
-
+    kernel_3x3 = cv.getStructuringElement(cv.MORPH_RECT, (3, 3))
+    mask = cv.dilate(mask, kernel_3x3, iterations=1)
     # Appliquer le masque sur l'image originale (si image contient des comptes, on conserve les valeurs)
     image_tracks = image * mask
     image_without_tracks = image - image_tracks
