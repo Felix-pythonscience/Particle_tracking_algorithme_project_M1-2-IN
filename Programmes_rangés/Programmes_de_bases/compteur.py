@@ -127,7 +127,7 @@ if __name__ == "__main__":
     file = "C:/Users/Félix/Desktop/Programmation/Projet_cea/Particle_tracking_algorithme_project_M1-2-IN/DATA-20251022T080148Z-1-001/DATA/beta_SrY/5min_beta_SrY_3cm_ground_source/5min_beta_SrY_3cm_ground_source_r1.t3pa"
    
     #Counting particles
-    counts = compteur_particles(file, t=0, d_time=1500000, plot=True, block=True, save=[False,"Test_compteur",Path.cwd()])
+    counts = compteur_particles(file, t=0, d_time=1500000, plot=True, block=True, save=[True,"Test_alpha",Path.cwd()])
     #spliting results
     N_alpha, N_electrons, N_muons, N_gamma = counts["Counts"]["alpha"], counts["Counts"]["electrons"], counts["Counts"]["muons"], counts["Counts"]["gamma"]
     print(f"Nombre de particules alpha détectées : {N_alpha}")

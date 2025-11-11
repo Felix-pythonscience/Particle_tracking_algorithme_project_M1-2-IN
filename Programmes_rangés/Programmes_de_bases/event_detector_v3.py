@@ -58,7 +58,7 @@ def event_counting_alpha(alpha_matrix, plot_result=False) :
 
 def event_counting_electron_muon(electron_muon_matrix, plot_result=False,
                                 eccentricity_threshold = 0.99,
-                                solidity_threshold = 0.75,
+                                solidity_threshold = 0.79,
                                 area_threshold = 10) :
 
     # Si matrice vide -> problème
