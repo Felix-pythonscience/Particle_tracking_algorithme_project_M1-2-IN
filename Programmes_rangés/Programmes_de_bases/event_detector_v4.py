@@ -41,7 +41,7 @@ def event_counting_alpha(uncorrected_alpha_matrix,
     alpha_only_matrix = uncorrected_alpha_matrix * (classification_matrix==1)
     alpha_count = 0
     # Si matrice vide 
-    if not np.any(alpha_only_matrix):
+    if np.any(alpha_only_matrix):
         
         # Matrice avec clusters labélisés des alphas et nombre de clusters, sans correction des chevauchements 
         labeled_alpha_only_matrix, num_clusters_alpha = label(alpha_only_matrix, structure=structure)      # fonction de scipy pour compter les cluster et avoir une matrice avec chaque cluster labelisé
