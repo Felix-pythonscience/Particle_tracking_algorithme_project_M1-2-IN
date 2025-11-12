@@ -1,6 +1,7 @@
 import numpy as np
 from pathlib import Path
 import sys
+import time
 parent_dir = Path(__file__).resolve().parent.parent
 sys.path.append(str(parent_dir))
 try:
@@ -100,12 +101,12 @@ def compteur_particles(file = "None", t= 0, d_time = None, plot = False, block =
                 "muons": N_muons,
                 "gamma": N_gamma
             },
-            "Images": {
+            "Images": None if not return_images else {
                 "original": image,
                 "alpha": image_alpha,
                 "tracks": image_tracks,
                 "gamma": image_gamma
-            } if return_images else None
+            }
             }
 
     if plot:
@@ -133,12 +134,13 @@ if __name__ == "__main__":
     file = "C:/Users/Graziani/Desktop/Projet_CEA/Projet/Particle_tracking_algorithme_project_M1-2-IN/DATA-20251022T080148Z-1-001/DATA/alpha/60sec_alpha_39kbq_2.5cm_r0.t3pa"
     #Counting particles
     data = read(file)
-    dt = 15E6
+    dt = 1.5E6
     n_windows = int(np.ceil(data.iloc[:, 1].max() / dt)) if dt > 0 else 1
     N_alpha_total = 0
     N_electrons_total = 0      
     N_muons_total = 0
     N_gamma_total = 0
+    time_start = time.time()
     for i in range(n_windows):
         counts = compteur_particles(file, t=i*dt, d_time=dt, plot=False, block=False, save=[False,"Test_alpha_qui_passe_pour_dafuk",Path.cwd()])
         #spliting results
@@ -147,8 +149,9 @@ if __name__ == "__main__":
         N_electrons_total += N_electrons
         N_muons_total += N_muons
         N_gamma_total += N_gamma
-        print(f"Fenêtre {i+1}/{n_windows} : Alpha={N_alpha}, Electrons={N_electrons}, Muons={N_muons}, Gamma={N_gamma}", end='\r', flush=True)
+        print(f"Fenêtre {i+1}/{n_windows} en {time.time() - time_start:.2f}s : Alpha={N_alpha}, Electrons={N_electrons}, Muons={N_muons}, Gamma={N_gamma}", end='\r', flush=True)
     print("\nRésultats totaux sur toutes les fenêtres temporelles :")
+    print(f"Temps total de traitement : {time.time() - time_start:.2f}s")
     print(f"Nombre de particules alpha détectées : {N_alpha_total}")
     print(f"Nombre de particules électrons détectées : {N_electrons_total}")
     print(f"Nombre de particules muons détectées : {N_muons_total}")
