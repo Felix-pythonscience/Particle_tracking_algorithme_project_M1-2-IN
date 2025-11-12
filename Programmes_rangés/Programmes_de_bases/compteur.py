@@ -24,7 +24,8 @@ except Exception:
 
 def compteur_particles(file = "None", t= 0, d_time = None, plot = False, block = False,
                     return_images=False, is_slice = False,save = [False,"plot_results.png",Path.cwd()],
-                    discrimination_criteria = {"alpha":{}, "electron_muon":{}}):
+                    discrimination_criteria = {"alpha":{}, "electron_muon":{}},
+                    loop=0):
     """Count particle types in a time window and optionally plot the results.
 
     This function reads the data (or accepts an already-loaded DataFrame/array),
@@ -123,16 +124,32 @@ def compteur_particles(file = "None", t= 0, d_time = None, plot = False, block =
 
     return results
 
+
+
 if __name__ == "__main__":
     # Lecture des données et création de l'image binaire
     #file = "C:/Users/Graziani/Desktop/Projet CEA/Particle_tracking_algorithme_project_M1-2-IN/DATA-20251022T080148Z-1-001/DATA/alpha/60sec_alpha_39kbq_2.5cm_r0.t3pa"
     #file = "C:/Users/Graziani/Desktop/Projet_CEA/Projet/Particle_tracking_algorithme_project_M1-2-IN/DATA-20251022T080148Z-1-001/DATA/Combined_Am_SrY/2.5cm/2.5cm_r0.t3pa"
     file = "C:/Users/Graziani/Desktop/Projet_CEA/Projet/Particle_tracking_algorithme_project_M1-2-IN/DATA-20251022T080148Z-1-001/DATA/alpha/60sec_alpha_39kbq_2.5cm_r0.t3pa"
     #Counting particles
-    counts = compteur_particles(file, t=0, d_time=1500000, plot=True, block=True, save=[False,"Test_alpha_qui_passe_pour_dafuk",Path.cwd()])
-    #spliting results
-    N_alpha, N_electrons, N_muons, N_gamma = counts["Counts"]["alpha"], counts["Counts"]["electrons"], counts["Counts"]["muons"], counts["Counts"]["gamma"]
-    print(f"Nombre de particules alpha détectées : {N_alpha}")
-    print(f"Nombre de particules électrons détectées : {N_electrons}")
-    print(f"Nombre de particules muons détectées : {N_muons}")
-    print(f"Nombre de particules gamma détectées : {N_gamma}")
+    data = read(file)
+    dt = 15E6
+    n_windows = int(np.ceil(data.iloc[:, 1].max() / dt)) if dt > 0 else 1
+    N_alpha_total = 0
+    N_electrons_total = 0      
+    N_muons_total = 0
+    N_gamma_total = 0
+    for i in range(n_windows):
+        counts = compteur_particles(file, t=i*dt, d_time=dt, plot=False, block=False, save=[False,"Test_alpha_qui_passe_pour_dafuk",Path.cwd()])
+        #spliting results
+        N_alpha, N_electrons, N_muons, N_gamma = counts["Counts"]["alpha"], counts["Counts"]["electrons"], counts["Counts"]["muons"], counts["Counts"]["gamma"]
+        N_alpha_total += N_alpha
+        N_electrons_total += N_electrons
+        N_muons_total += N_muons
+        N_gamma_total += N_gamma
+        print(f"Fenêtre {i+1}/{n_windows} : Alpha={N_alpha}, Electrons={N_electrons}, Muons={N_muons}, Gamma={N_gamma}", end='\r', flush=True)
+    print("\nRésultats totaux sur toutes les fenêtres temporelles :")
+    print(f"Nombre de particules alpha détectées : {N_alpha_total}")
+    print(f"Nombre de particules électrons détectées : {N_electrons_total}")
+    print(f"Nombre de particules muons détectées : {N_muons_total}")
+    print(f"Nombre de particules gamma détectées : {N_gamma_total}")

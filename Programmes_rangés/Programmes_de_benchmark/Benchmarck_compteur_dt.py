@@ -82,9 +82,9 @@ start_time = time.time()  # moment de départ pour la mesure globale
 script_dir = Path(__file__).resolve().parent  # dossier contenant ce script
 
 # Dossier contenant les fichiers .t3pa à traiter (modifiable)
-folder = r"C:/Users/Félix/Desktop/Programmation/Projet_cea/Particle_tracking_algorithme_project_M1-2-IN/DATA-20251022T080148Z-1-001/DATA/combined_Am_SrY/2.5cm"
+folder = "C:/Users/Graziani/Desktop/Projet_CEA/Projet/Particle_tracking_algorithme_project_M1-2-IN/DATA-20251022T080148Z-1-001/DATA/alpha"
 # Récupère la liste des fichiers .t3pa sous ce dossier (récursif)
-files = list_files(folder, recursive=True, extensions=['.t3pa'])
+files = list_files(folder, recursive=False, extensions=['.t3pa'])
 
 # Listes pour stocker les résultats et temps
 time_ends = []
@@ -120,7 +120,7 @@ for file in [files[0]]:
                 file=data,  # on passe l'objet DataFrame directement pour éviter une relecture disque
                 t=t * dt,  # temps de départ de la tranche
                 d_time=dt,  # durée de la tranche
-                save=[True if t == 0 else False,  # sauvegarde seulement pour la première tranche
+                save=[False if t == 0 else False,  # sauvegarde seulement pour la première tranche
                       Path(f"dt = 1 divisé par {str(x[i]).zfill(4)}"),
                       script_dir / "Benchmark_Results" / "compteur5" / "Evolution_détections_en_fonction_de_dt"])["Counts"]
             N_alpha_dt, N_electrons_dt, N_muons_dt, N_gamma_dt = counts["alpha"], counts["electrons"], counts["muons"], counts["gamma"]
