@@ -8,7 +8,7 @@ try:
     from .read_file import read, slice, slice_Tot
     from .filtres import filtre_alpha, filtre_tracks
     from .plot_results import plot_results
-    from .event_detector_v3 import event_counting_alpha, event_counting_electron_muon,event_counting_photon
+    from .event_detector_v4 import event_counting_alpha, event_counting_electron_muon,event_counting_photon
     # diagnostic: indicate which import branch succeeded
    
 except Exception:
@@ -17,7 +17,7 @@ except Exception:
     from read_file import read, slice, slice_Tot
     from filtres import filtre_alpha, filtre_tracks
     from plot_results import plot_results
-    from event_detector_v3 import event_counting_alpha, event_counting_electron_muon,event_counting_photon
+    from event_detector_v4 import event_counting_alpha, event_counting_electron_muon,event_counting_photon
     # diagnostic: indicate fallback import used
    
 
@@ -70,16 +70,18 @@ def compteur_particles(file = "None", t= 0, d_time = None, plot = False, block =
 
         image = slice(data.to_numpy(), t, d_time)
 
-    # Morphological filtering
+    # Morphological filtering of alpha
     image_without_alpha, image_alpha = filtre_alpha(image)# Appliquer le filtre pour enlever les tracks
 
-    image_gamma, image_tracks = filtre_tracks(image_without_alpha)# Appliquer le filtre pour enlever les tracks
+    
+    #Counting particles + cluster based filtering of alpha
 
+    N_alpha,falses_alphas = event_counting_alpha(image_alpha, solidity_threshold=discrimination_criteria["alpha"].get("solidity_threshold", 0.2))
 
+    #filtering of tracks
+    # Appliquer le filtre pour enlever les tracks
+    image_gamma, image_tracks = filtre_tracks(image_without_alpha,falses_alphas=falses_alphas)
 
-    #Counting particles + cluster based filtering
-
-    N_alpha = event_counting_alpha(image_alpha)
 
     N_electrons , N_muons, N_alpha_corr = event_counting_electron_muon(electron_muon_matrix = image_tracks,
                                                                        eccentricity_threshold=discrimination_criteria["electron_muon"].get("eccentricity_threshold", 0.99),
@@ -124,8 +126,8 @@ def compteur_particles(file = "None", t= 0, d_time = None, plot = False, block =
 if __name__ == "__main__":
     # Lecture des données et création de l'image binaire
     #file = "C:/Users/Graziani/Desktop/Projet CEA/Particle_tracking_algorithme_project_M1-2-IN/DATA-20251022T080148Z-1-001/DATA/alpha/60sec_alpha_39kbq_2.5cm_r0.t3pa"
-    file = "C:/Users/Félix/Desktop/Programmation/Projet_cea/Particle_tracking_algorithme_project_M1-2-IN/DATA-20251022T080148Z-1-001/DATA/beta_SrY/5min_beta_SrY_3cm_ground_source/5min_beta_SrY_3cm_ground_source_r1.t3pa"
-   
+    #file = "C:/Users/Graziani/Desktop/Projet_CEA/Projet/Particle_tracking_algorithme_project_M1-2-IN/DATA-20251022T080148Z-1-001/DATA/Combined_Am_SrY/2.5cm/2.5cm_r0.t3pa"
+    file = "C:/Users/Graziani/Desktop/Projet_CEA/Projet/Particle_tracking_algorithme_project_M1-2-IN/DATA-20251022T080148Z-1-001/DATA/beta_SrY/5min_beta_SrY_2cm_ground_source/5min_beta_SrY_2cm_ground_source_prise2_r0.t3pa"
     #Counting particles
     counts = compteur_particles(file, t=0, d_time=1500000, plot=True, block=True, save=[False,"Test_compteur",Path.cwd()])
     #spliting results

@@ -70,7 +70,47 @@ def filtre_alpha(image):
     image_without_alpha = image - image_alpha
     return image_without_alpha, image_alpha
 
-def filtre_tracks(image):
+def filtre_tracks(image, falses_alphas:np.ndarray = None):
+    """
+    Morphological filtering to separate tracks (electrons/muons) from the image.
+    Parameters
+    ----------
+    image : ndarray
+        Input image to filter.
+    falses_alphas : ndarray, optional
+        Optional mask of false alphas to include in tracks.
+    Returns
+    -------
+    tuple
+        (image_without_tracks, image_tracks) as uint8 arrays.
+
+    """
+    ## Reconstruction of the false alpha matrix 
+    ## Reconstruction of the false alpha matrix 
+    if falses_alphas is not None:
+        falses_alphas_image = np.zeros_like(image, dtype=np.uint8)
+        # Version vectorisée : empile les listes de pixels puis indexe en masse
+        try:
+            # gestion si falses_alphas est vide
+            if len(falses_alphas) == 0:
+                stacked = np.empty((0, 2), dtype=int)
+            else:
+                stacked = np.vstack([np.asarray(fa) for fa in falses_alphas])
+            if stacked.size:
+                rows = stacked[:, 0].astype(np.intp)
+                cols = stacked[:, 1].astype(np.intp)
+                # sécurité bornes indices
+                rows = np.clip(rows, 0, image.shape[0] - 1)
+                cols = np.clip(cols, 0, image.shape[1] - 1)
+                falses_alphas_image[rows, cols] = 1
+        except Exception:
+            # Fallback robuste si format inattendu
+            for false_alpha in falses_alphas:
+                for pixels in false_alpha:
+                    falses_alphas_image[int(pixels[0]), int(pixels[1])] = 1
+        image = np.maximum(image, falses_alphas_image)
+
+    ## filtering of tracks
     # Kernel vertical et horizontal
     structure_verticale = np.ones((1, 4), dtype=np.uint8)
     structure_horizontale = np.ones((4, 1), dtype=np.uint8)

@@ -38,8 +38,8 @@ def event_counting_alpha(uncorrected_alpha_matrix,
 
     ### PARTIE COMPTAGE D'ALPHAS ET CHEVAUCHEMENT
     # Matrice avec uniquement les alphas
-    alpha_only_matrix = uncorrected_alpha_matrix * classification_matrix==1
-    
+    alpha_only_matrix = uncorrected_alpha_matrix * (classification_matrix==1)
+    alpha_count = 0
     # Si matrice vide 
     if not np.any(alpha_only_matrix):
         
@@ -60,7 +60,7 @@ def event_counting_alpha(uncorrected_alpha_matrix,
         estimated_counts = np.round(sizes / typical_size)   # liste de l'arrondi de la taille des cluster par rapport a la taille mediane
         estimated_counts[estimated_counts == 0] = 1     # transforme les arrondis 0 en 1 
         #print("Liste des rapport de taille avec la médiane : \n", estimated_counts, "\n")
-        aplha_count = int(np.sum(estimated_counts))    # valeur du comptage avec prise en compte du chevauchement  (somme de la liste estimated_sounts)
+        alpha_count = int(np.sum(estimated_counts))    # valeur du comptage avec prise en compte du chevauchement  (somme de la liste estimated_sounts)
         #print("Nombre de cluster avec filtre de chevauchement : ", aplha_count, "\n")
         
     # Affichage du graphique optionel des chevauchements
@@ -94,7 +94,7 @@ def event_counting_alpha(uncorrected_alpha_matrix,
         plt.xlabel("X")
         plt.ylabel("Y")
     
-    return aplha_count, all_cluster_coords
+    return alpha_count, all_cluster_coords
 
 #%% Fonction de comptage beta/muons/
 
