@@ -86,7 +86,7 @@ def compteur_particles(file = "None", t= 0, d_time = None, plot = False, block =
 
     N_electrons , N_muons, N_alpha_corr = event_counting_electron_muon(electron_muon_matrix = image_tracks,
                                                                        eccentricity_threshold=discrimination_criteria["electron_muon"].get("eccentricity_threshold", 0.99),
-                                                                       solidity_threshold=discrimination_criteria["electron_muon"].get("solidity_threshold", 0.75),
+                                                                       solidity_threshold=discrimination_criteria["electron_muon"].get("solidity_threshold", 0.99),
                                                                        area_threshold=discrimination_criteria["electron_muon"].get("area_threshold", 10))
 
     N_alpha += N_alpha_corr
@@ -131,7 +131,7 @@ if __name__ == "__main__":
     #file = "C:/Users/Graziani/Desktop/Projet CEA/Particle_tracking_algorithme_project_M1-2-IN/DATA-20251022T080148Z-1-001/DATA/alpha/60sec_alpha_39kbq_2.5cm_r0.t3pa"
     #file = "C:/Users/Graziani/Desktop/Projet_CEA/Projet/Particle_tracking_algorithme_project_M1-2-IN/DATA-20251022T080148Z-1-001/DATA/Combined_Am_SrY/2.5cm/2.5cm_r0.t3pa"
     #file = "C:/Users/Graziani/Desktop/Projet_CEA/Projet/Particle_tracking_algorithme_project_M1-2-IN/DATA-20251022T080148Z-1-001/DATA/alpha/60sec_alpha_39kbq_2.5cm_r0.t3pa"
-    file = "C:/Users/Graziani/Desktop/Projet_CEA\Projet\Particle_tracking_algorithme_project_M1-2-IN/DATA-20251022T080148Z-1-001/DATA/beta_SrY/5min_beta_SrY_2cm_ground_source/5min_beta_SrY_2cm_ground_source_prise2_r0.t3pa"
+    file = "C:/Users/Graziani/Desktop/Projet_CEA/Projet/Particle_tracking_algorithme_project_M1-2-IN/DATA-20251022T080148Z-1-001/DATA/beta_SrY/5min_beta_SrY_2cm_ground_source/5min_beta_SrY_2cm_ground_source_prise2_r0.t3pa"
     data = read(file)
     dt = 1.5E7
     n_windows = int(np.ceil(data.iloc[:, 1].max() / dt)) if dt > 0 else 1
@@ -141,14 +141,14 @@ if __name__ == "__main__":
     N_gamma_total = 0
     time_start = time.time()
     for i in range(n_windows):
-        counts = compteur_particles(file, t=i*dt, d_time=dt, plot=False, block=False, save=[False,"Test_alpha_qui_passe_pour_dafuk",Path.cwd()])
+        counts = compteur_particles(file, t=i*dt, d_time=dt, save=[False,"Test_alpha_qui_passe_pour_dafuk",Path.cwd()])
         #spliting results
         N_alpha, N_electrons, N_muons, N_gamma = counts["Counts"]["alpha"], counts["Counts"]["electrons"], counts["Counts"]["muons"], counts["Counts"]["gamma"]
         N_alpha_total += N_alpha
         N_electrons_total += N_electrons
         N_muons_total += N_muons
         N_gamma_total += N_gamma
-        print(f"Fenêtre {i+1}/{n_windows} en {time.time() - time_start:.2f}s : Alpha={N_alpha}, Electrons={N_electrons}, Muons={N_muons}, Gamma={N_gamma}", end='\r', flush=True)
+        print(f"Fenêtre {i+1}/{n_windows} en {time.time() - time_start:.2f}s : Alpha={N_alpha}, Electrons={N_electrons}, Muons={N_muons}, Gamma={N_gamma}", end='\n ', flush=True)
     print("\nRésultats totaux sur toutes les fenêtres temporelles :")
     print(f"Temps total de traitement : {time.time() - time_start:.2f}s")
     print(f"Nombre de particules alpha détectées : {N_alpha_total}")

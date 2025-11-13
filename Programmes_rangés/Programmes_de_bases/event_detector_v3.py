@@ -104,6 +104,7 @@ def event_counting_electron_muon(electron_muon_matrix, plot_result=False,
         plt.title(f"Classification des particules (Électrons: {electron_count}, Muons: {muon_count}, Alphas: {alpha_count})")
         plt.xlabel("X")
         plt.ylabel("Y")
+        plt.show(block=True)
         
     return electron_count, muon_count, alpha_count
 
