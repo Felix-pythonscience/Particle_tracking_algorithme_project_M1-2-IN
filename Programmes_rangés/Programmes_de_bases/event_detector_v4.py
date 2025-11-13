@@ -17,7 +17,7 @@ def event_counting_alpha(uncorrected_alpha_matrix,
 
     # Si matrice vide -> problème
     if not np.any(uncorrected_alpha_matrix):
-        return 0,0
+        return 0,[]
 
     # Labelise et compte le nombre de cluster trouvé, sans discrimination ni de critere de chevauchement 
     structure = np.ones((3, 3), dtype=int)  # crée une matrice 2D de 3 sur 3 remplie 1 qui correspond aux 8 positions possibles autour du pixel observé
@@ -62,8 +62,7 @@ def event_counting_alpha(uncorrected_alpha_matrix,
         #print("Liste des rapport de taille avec la médiane : \n", estimated_counts, "\n")
         alpha_count = int(np.sum(estimated_counts))    # valeur du comptage avec prise en compte du chevauchement  (somme de la liste estimated_sounts)
         #print("Nombre de cluster avec filtre de chevauchement : ", aplha_count, "\n")
-        
-    # Affichage du graphique optionel des chevauchements
+            # Affichage du graphique optionel des chevauchements
     if plot_result:   
         overlap_matrix = labeled_alpha_only_matrix.copy()
         for i in np.unique(labeled_alpha_only_matrix):

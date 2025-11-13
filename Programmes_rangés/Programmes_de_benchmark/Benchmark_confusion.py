@@ -56,7 +56,7 @@ def get_current_memory_usage_mib():
 if __name__ == "__main__":
     # Load cluster files once
     cluster_files = [np.load(i, allow_pickle=True) for i in list_npy_files(
-        "C:/Users/Félix/Desktop/Programmation/Projet_cea/Particle_tracking_algorithme_project_M1-2-IN/DATA-20251022T080148Z-1-001/DATA/Combined_Am_SrY/2.5cm",
+        "C:/Users/Graziani/Desktop/Projet_CEA/Projet/Particle_tracking_algorithme_project_M1-2-IN/DATA-20251022T080148Z-1-001/DATA/Combined_Am_SrY/2.5cm",
         recursive=False
     )]
 
@@ -79,7 +79,7 @@ if __name__ == "__main__":
     print(f"Alpha: {N_alpha_true}, Electrons: {N_electron_true}, Muons: {N_muon_true}, Gamma: {N_gamma_true}, Other: {N_other_true}")
 
     # Prepare solidity threshold sweep
-    solidity_values = np.round(np.arange(0.6, 0.991, 0.02), 3)
+    solidity_values = [np.round(0.79, 3)]
     rel_err_alpha = []
     rel_err_electron = []
 
@@ -123,7 +123,7 @@ if __name__ == "__main__":
                     img,
                     is_slice=True,
                     discrimination_criteria={
-                        "alpha": {},
+                        "alpha": {"solidity_threshold": 0},
                         "electron_muon": {
                             "eccentricity_threshold": 0.99,
                             "solidity_threshold": float(sol),

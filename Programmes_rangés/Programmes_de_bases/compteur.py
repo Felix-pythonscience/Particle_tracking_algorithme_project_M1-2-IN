@@ -9,7 +9,7 @@ try:
     from .read_file import read, slice, slice_Tot
     from .filtres import filtre_alpha, filtre_tracks
     from .plot_results import plot_results
-    from .event_detector_v4 import event_counting_alpha, event_counting_electron_muon,event_counting_photon
+    from .event_detector_v3 import event_counting_alpha, event_counting_electron_muon,event_counting_photon
     # diagnostic: indicate which import branch succeeded
    
 except Exception:
@@ -18,14 +18,14 @@ except Exception:
     from read_file import read, slice, slice_Tot
     from filtres import filtre_alpha, filtre_tracks
     from plot_results import plot_results
-    from event_detector_v4 import event_counting_alpha, event_counting_electron_muon,event_counting_photon
+    from event_detector_v3 import event_counting_alpha, event_counting_electron_muon,event_counting_photon
     # diagnostic: indicate fallback import used
    
 
 
 def compteur_particles(file = "None", t= 0, d_time = None, plot = False, block = False,
                     return_images=False, is_slice = False,save = [False,"plot_results.png",Path.cwd()],
-                    discrimination_criteria = {"alpha":{}, "electron_muon":{}},
+                    discrimination_criteria = {"electron_muon":{}},
                     loop=0):
     """Count particle types in a time window and optionally plot the results.
 
@@ -68,7 +68,7 @@ def compteur_particles(file = "None", t= 0, d_time = None, plot = False, block =
         image = file
     else:
         data = file if not(type(file) == str) else read(file)
-        d_time = d_time if d_time!=None else 150000000  # Diviser le temps
+        d_time = d_time if d_time!=None else 15e6  # Diviser le temps
 
         image = slice(data.to_numpy(), t, d_time)
 
@@ -78,11 +78,10 @@ def compteur_particles(file = "None", t= 0, d_time = None, plot = False, block =
     
     #Counting particles + cluster based filtering of alpha
 
-    N_alpha,falses_alphas = event_counting_alpha(image_alpha, solidity_threshold=discrimination_criteria["alpha"].get("solidity_threshold", 0.2))
-
+    N_alpha = event_counting_alpha(image_alpha)
     #filtering of tracks
     # Appliquer le filtre pour enlever les tracks
-    image_gamma, image_tracks = filtre_tracks(image_without_alpha,falses_alphas=falses_alphas)
+    image_gamma, image_tracks = filtre_tracks(image_without_alpha)
 
 
     N_electrons , N_muons, N_alpha_corr = event_counting_electron_muon(electron_muon_matrix = image_tracks,
@@ -131,10 +130,10 @@ if __name__ == "__main__":
     # Lecture des données et création de l'image binaire
     #file = "C:/Users/Graziani/Desktop/Projet CEA/Particle_tracking_algorithme_project_M1-2-IN/DATA-20251022T080148Z-1-001/DATA/alpha/60sec_alpha_39kbq_2.5cm_r0.t3pa"
     #file = "C:/Users/Graziani/Desktop/Projet_CEA/Projet/Particle_tracking_algorithme_project_M1-2-IN/DATA-20251022T080148Z-1-001/DATA/Combined_Am_SrY/2.5cm/2.5cm_r0.t3pa"
-    file = "C:/Users/Graziani/Desktop/Projet_CEA/Projet/Particle_tracking_algorithme_project_M1-2-IN/DATA-20251022T080148Z-1-001/DATA/alpha/60sec_alpha_39kbq_2.5cm_r0.t3pa"
-    #Counting particles
+    #file = "C:/Users/Graziani/Desktop/Projet_CEA/Projet/Particle_tracking_algorithme_project_M1-2-IN/DATA-20251022T080148Z-1-001/DATA/alpha/60sec_alpha_39kbq_2.5cm_r0.t3pa"
+    file = "C:/Users/Graziani/Desktop/Projet_CEA\Projet\Particle_tracking_algorithme_project_M1-2-IN/DATA-20251022T080148Z-1-001/DATA/beta_SrY/5min_beta_SrY_2cm_ground_source/5min_beta_SrY_2cm_ground_source_prise2_r0.t3pa"
     data = read(file)
-    dt = 1.5E6
+    dt = 1.5E7
     n_windows = int(np.ceil(data.iloc[:, 1].max() / dt)) if dt > 0 else 1
     N_alpha_total = 0
     N_electrons_total = 0      

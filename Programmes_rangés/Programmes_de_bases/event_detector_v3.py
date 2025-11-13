@@ -36,7 +36,7 @@ def event_counting_alpha(alpha_matrix, plot_result=False) :
     estimated_counts = np.round(sizes / typical_size)   # liste de l'arrondi de la taille des cluster par rapport a la taille mediane
     estimated_counts[estimated_counts == 0] = 1     # transforme les arrondis 0 en 1 
     #print("Liste des rapport de taille avec la médiane : \n", estimated_counts, "\n")
-    aplha_count = int(np.sum(estimated_counts))    # valeur du comptage avec prise en compte du chevauchement  (somme de la liste estimated_sounts)
+    alpha_count = int(np.sum(estimated_counts))    # valeur du comptage avec prise en compte du chevauchement  (somme de la liste estimated_sounts)
     #print("Nombre de cluster avec filtre de chevauchement : ", aplha_count, "\n")
     
     
@@ -52,7 +52,7 @@ def event_counting_alpha(alpha_matrix, plot_result=False) :
         plt.xlabel("X")
         plt.ylabel("Y")
     
-    return aplha_count
+    return alpha_count
 
 #%% Fonction de comptage beta/muons/
 
