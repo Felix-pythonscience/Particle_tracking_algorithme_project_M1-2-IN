@@ -100,7 +100,9 @@ def slice_Tot(data,time,d_time):
     return image
 
 
-def optimised_slice(data,dt,TOT=False,t_min=None,t_max=None,progress_bar=False):
+def optimised_slice(data, dt, TOT=False, t_min=None, t_max=None,
+                    progress_bar=False, progress_callback=None, stop_requested=None):
+     
     """Slice the input detections into multiple time-window images.
 
     This function examines the timestamps present in ``data`` and builds a list
@@ -208,7 +210,7 @@ def optimised_slice(data,dt,TOT=False,t_min=None,t_max=None,progress_bar=False):
             # binary image: a hit sets pixel to 1
             flat_img = np.zeros(Npix, dtype=np.uint8)
             flat_img[flat] = 1
-        slices.append(flat_img.reshape((256, 256))) 
+        slices.append(flat_img.reshape((256, 256)))
     if progress_bar:
         print('\n')
 
