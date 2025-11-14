@@ -1,4 +1,4 @@
-
+# ...existing code...
 import numpy as np
 from pathlib import Path
 import matplotlib.pyplot as plt
@@ -79,7 +79,7 @@ if __name__ == "__main__":
     print(f"Alpha: {N_alpha_true}, Electrons: {N_electron_true}, Muons: {N_muon_true}, Gamma: {N_gamma_true}, Other: {N_other_true}")
 
     # Prepare solidity threshold sweep
-    solidity_values = [np.round(1, 3)]
+    solidity_values = [np.round(0.79, 3)]
     rel_err_alpha = []
     rel_err_electron = []
 

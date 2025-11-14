@@ -10,11 +10,16 @@ from scipy.ndimage import label, sum as ndi_sum
 import matplotlib.pyplot as plt
 from skimage.measure import regionprops
 
+#%% Recupere le fichier
 
-def event_counting_alpha(alpha_matrix, plot_result=False) :
+df = np.load("muon_electron.npy")   
+
+#%% Fonction de comptage alpha
+
+def event_counting_alpha(alpha_matrix, plot_result=True) :
 
     # Si matrice vide -> problème
-    if not np.any(alpha_matrix):
+    if np.sum(alpha_matrix) == 0:
         return 0
 
     # Labelise et compte le nombre de cluster trouvé sans critere de chevauchement 
@@ -36,7 +41,7 @@ def event_counting_alpha(alpha_matrix, plot_result=False) :
     estimated_counts = np.round(sizes / typical_size)   # liste de l'arrondi de la taille des cluster par rapport a la taille mediane
     estimated_counts[estimated_counts == 0] = 1     # transforme les arrondis 0 en 1 
     #print("Liste des rapport de taille avec la médiane : \n", estimated_counts, "\n")
-    alpha_count = int(np.sum(estimated_counts))    # valeur du comptage avec prise en compte du chevauchement  (somme de la liste estimated_sounts)
+    aplha_count = int(np.sum(estimated_counts))    # valeur du comptage avec prise en compte du chevauchement  (somme de la liste estimated_sounts)
     #print("Nombre de cluster avec filtre de chevauchement : ", aplha_count, "\n")
     
     
@@ -52,20 +57,20 @@ def event_counting_alpha(alpha_matrix, plot_result=False) :
         plt.xlabel("X")
         plt.ylabel("Y")
     
-    return alpha_count
+    return aplha_count
 
 #%% Fonction de comptage beta/muons/
 
-def event_counting_electron_muon(electron_muon_matrix, plot_result=False,
-                                eccentricity_threshold = 0.99,
-                                solidity_threshold = 0.79,
-                                area_threshold = 10) :
+def event_counting_electron_muon(electron_muon_matrix, plot_result=True) :
 
     # Si matrice vide -> problème
     if not np.any(electron_muon_matrix):
-        return 0,0,0
+        return 0
     
-    
+    # Critère discri 
+    eccentricity_threshold = 0.99
+    solidity_threshold = 0.99
+    area_threshold = 10
     
     # Labelise et compte le nombre de cluster trouvé
     structure = np.ones((3, 3), dtype=int)  # crée une matrice 2D 3c et 3l de 1 qui correspond aux 8 positions possibles autour du pixel observé
@@ -88,11 +93,11 @@ def event_counting_electron_muon(electron_muon_matrix, plot_result=False,
         if is_muon:
             muon_count += 1
             classification_matrix[labeled_matrix == props.label] = 2
-            #print("muon", props.eccentricity)
+            print("muon", props.eccentricity)
         elif is_alpha:
             alpha_count += 1
             classification_matrix[labeled_matrix == props.label] = 1
-            #print("alpha", props.solidity)
+            print("alpha", props.solidity)
         else:
             electron_count += 1
             classification_matrix[labeled_matrix == props.label] = 3
@@ -104,7 +109,6 @@ def event_counting_electron_muon(electron_muon_matrix, plot_result=False,
         plt.title(f"Classification des particules (Électrons: {electron_count}, Muons: {muon_count}, Alphas: {alpha_count})")
         plt.xlabel("X")
         plt.ylabel("Y")
-        plt.show(block=True)
         
     return electron_count, muon_count, alpha_count
 
@@ -113,13 +117,11 @@ def event_counting_electron_muon(electron_muon_matrix, plot_result=False,
 
 def event_counting_photon(photon_matrix) :
     
-    # Si matrice vide -> problème
-    if not np.any(photon_matrix):
-        return 0    
-    
     structure = np.ones((3, 3), dtype=int)
-    photon_count = label(photon_matrix, structure=structure)[1]
+    labeled_matrix, photon_count = label(photon_matrix, structure=structure)
     
     return photon_count
 
 
+#%% Appel
+print(event_counting_electron_muon(df, False))
