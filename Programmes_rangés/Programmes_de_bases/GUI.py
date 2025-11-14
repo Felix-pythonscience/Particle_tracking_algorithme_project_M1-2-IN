@@ -30,7 +30,7 @@ from Programmes_de_bases.compteur import compteur_particles_optimized, compteur_
 
 from PySide6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QLabel, QPushButton, QVBoxLayout,
-    QHBoxLayout, QFileDialog, QGroupBox, QGridLayout, QSizePolicy
+    QHBoxLayout, QFileDialog, QGroupBox, QGridLayout, QSizePolicy, QProgressBar
 )
 from PySide6.QtCore import Qt, QThread, Signal
 from PySide6.QtGui import QImage, QPixmap
@@ -55,7 +55,7 @@ class CountWorker(QThread):
     """
     finished = Signal(dict)
     error = Signal(str)
-
+    progress = Signal(float, str)   # progress (0.0-1.0), message
     def __init__(self, file_path: str, discr_crit=None, parent=None):
         super().__init__(parent)
         self.file_path = file_path
@@ -65,9 +65,22 @@ class CountWorker(QThread):
     def run(self):
         # Called in the worker thread. Keep it minimal and return plain Python objects.
         try:
+            # build a progress callback that emits the Qt signal from the worker thread
+            def cb(progress, message=""):
+                try:
+                    # ensure numeric progress between 0 and 1
+                    p = float(progress) if progress is not None else 0.0
+                    if p < 0.0: p = 0.0
+                    if p > 1.0: p = 1.0
+                except Exception:
+                    p = 0.0
+                self.progress.emit(p, str(message or ""))
+            # pass QThread interruption checker as stop_requested
             res = compteur_particles_optimized(file=self.file_path,
                                               discrimination_criteria=self.discr_crit,
-                                              progress_bar=False)
+                                              progress_bar=False,
+                                              progress_callback=cb,
+                                              stop_requested=self.isInterruptionRequested)
             self.finished.emit(res or {})
         except Exception as e:
             # Send readable error to the GUI thread
@@ -96,6 +109,9 @@ class MainWindow(QMainWindow):
         central = QWidget()
         self.setCentralWidget(central)
         main_layout = QVBoxLayout(central)
+        # réduire l'espacement vertical pour rapprocher les widgets (status / progressbar)
+        main_layout.setSpacing(6)
+        main_layout.setContentsMargins(8, 8, 8, 8)
 
         # Controls row
         ctrl_layout = QHBoxLayout()
@@ -146,7 +162,44 @@ class MainWindow(QMainWindow):
 
         # Simple status label
         self.status = QLabel("Ready")
-        main_layout.addWidget(self.status)
+        # augmenter la police et rendre le label plus compact (rapproché de la progress bar)
+        self.status.setStyleSheet("font-size:14px; font-weight:600; color: #111;")
+        # supprimer marges internes si présentes
+        self.status.setContentsMargins(0, 0, 0, 0)
+        main_layout.addWidget(self.status, alignment=Qt.AlignLeft)
+
+        # Title for the progress area (user requested "bar de progression")
+        self.progress_title = QLabel("Bar de progression")
+        self.progress_title.setStyleSheet("font-size:12px; font-weight:600; color: #111;")
+        main_layout.addWidget(self.progress_title, alignment=Qt.AlignLeft)
+
+        # Literal progress bar (range 0..200, fills in green) with white background and visible black text
+        self.progress_bar = QProgressBar()
+        self.progress_bar.setRange(0, 200)           # "10 par 200" expressed as 0..200 steps
+        self.progress_bar.setValue(0)
+        self.progress_bar.setTextVisible(True)       # ensure text is visible inside the bar
+        # hauteur réduite pour paraître plus serrée avec le status
+        self.progress_bar.setFixedHeight(18)
+        # style : fond blanc, texte noir, chunk vert
+        self.progress_bar.setStyleSheet("""
+            QProgressBar {
+                border: 1px solid #bbb;
+                background: #ffffff;
+                height: 18px;
+                border-radius: 4px;
+                color: #000000;           /* text color inside the bar */
+                padding-left: 6px;
+                padding-right: 6px;
+            }
+            QProgressBar::chunk {
+                background-color: #4caf50; /* green chunk */
+                margin: 0px;
+            }
+        """)
+        # default text format (will be overwritten by setFormat in _on_progress)
+        self.progress_bar.setFormat("%p%")
+        main_layout.addWidget(self.progress_bar)
+        
 
     # ------------------ UI actions ------------------
     def select_file(self):
@@ -203,6 +256,7 @@ class MainWindow(QMainWindow):
         self.worker = CountWorker(self.selected_file)
         self.worker.finished.connect(self._on_finished)
         self.worker.error.connect(self._on_error)
+        self.worker.progress.connect(self._on_progress)   # connect progress
         self.worker.start()
 
     def _on_finished(self, results: dict):
@@ -221,6 +275,35 @@ class MainWindow(QMainWindow):
         self.btn_run.setEnabled(True)
         self.btn_select.setEnabled(True)
 
+    def _on_progress(self, progress: float, message: str):
+        """Update the status bar with progress from the worker.
+
+        The message previously shown in self.status is now displayed inside the progress bar.
+        self.status keeps higher-level state (Ready / Running / Done / Error).
+        """
+        # clamp & percentage
+        try:
+            p = max(0.0, min(1.0, float(progress)))
+            pct = int(round(p * 100))
+        except Exception:
+            p = 0.0
+            pct = 0
+
+        # map progress [0.0..1.0] to progress_bar [0..200]
+        try:
+            v = int(round(p * 200))
+        except Exception:
+            v = 0
+
+        # Set the numeric value and show the message + percent inside the bar
+        try:
+            self.progress_bar.setValue(v)
+            # Put the message inside the progress bar text (fallback to percent if message empty)
+            display_msg = f"{message} ({pct}%)" if message else f"{pct}%"
+            # Use setFormat to display arbitrary text
+            self.progress_bar.setFormat(display_msg)
+        except Exception:
+            pass
 
 def main():
     app = QApplication(sys.argv)
@@ -230,30 +313,4 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
-import numpy as np
-from pathlib import Path
-import sys
-from PySide6.QtWidgets import QApplication, QMainWindow
-parent_dir = Path(__file__).resolve().parent.parent
-sys.path.append(str(parent_dir))
-from Programmes_de_bases.compteur import compteur_particles_optimized,compteur_particles
-
-
-
-
-
-# empty_window.py
-
-
-
-def main():
-    app = QApplication(sys.argv)
-    win = QMainWindow()
-    win.setWindowTitle("Fenêtre PySide6 vide")
-    win.resize(1400, 1000)      # largeur x hauteur en pixels
-    win.show()
-    sys.exit(app.exec())
-
-if __name__ == "__main__":
     main()

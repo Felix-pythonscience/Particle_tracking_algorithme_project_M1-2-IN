@@ -20,14 +20,14 @@ def read(file):
     return df.iloc[:, [1,2,3]]
 
 
-def slice(data,time,d_time):
+def slice(data,t,d_time):
     """Make a binary 256x256 image from detections within a time window.
 
     Parameters
     ----------
     data : ndarray
         NxM array with detection rows. Column 0 is the pixel index, column 1 is time.
-    time : float
+    t : float
         Start time of the window.
     d_time : float
         Duration of the time window.
@@ -40,7 +40,7 @@ def slice(data,time,d_time):
     """
     image = np.zeros((256,256)) #Création image vide 
 
-    mask = (data[:, 1] >= time) & (data[:, 1] <= time + d_time) # Filtrage des données selon le temps
+    mask = (data[:, 1] >= t) & (data[:, 1] <= t + d_time) # Filtrage des données selon le temps
     data_cut = data[mask]
 
       # Vectorised assignment: compute coordinates for all detections then assign
@@ -58,7 +58,7 @@ def slice(data,time,d_time):
     image[xs, ys] = values
     return image
 
-def slice_Tot(data,time,d_time):
+def slice_Tot(data,t,d_time):
     """Make a 256x256 image where pixel values are set to the 'TOT' value.
 
     This function uses column 2 of the input data as the pixel intensity (TOT).
@@ -81,7 +81,7 @@ def slice_Tot(data,time,d_time):
     """
     image = np.zeros((256,256)) #Création image vide 
 
-    mask = (data[:, 1] >= time) & (data[:, 1] < time + d_time) # Filtrage des données selon le temps
+    mask = (data[:, 1] >= t) & (data[:, 1] < t + d_time) # Filtrage des données selon le temps
     data_cut = data[mask]
 
     # Vectorised assignment: compute coordinates for all detections then assign
@@ -101,7 +101,8 @@ def slice_Tot(data,time,d_time):
 
 
 def optimised_slice(data, dt, TOT=False, t_min=None, t_max=None,
-                    progress_bar=False, progress_callback=None, stop_requested=None):
+                    progress_bar=False, progress_callback=None,
+                      stop_requested=None):
      
     """Slice the input detections into multiple time-window images.
 
@@ -150,6 +151,15 @@ def optimised_slice(data, dt, TOT=False, t_min=None, t_max=None,
     - The function uses unique timestamps as potential window starts; it does
       not generate a dense tiling of windows.
     """
+     # make sure we have safe callables
+    if progress_callback is None:
+        def progress_callback(progress, message=""):
+            return None
+    if stop_requested is None:
+        def stop_requested():
+            return False
+
+      
 
     # determine time interval to consider
     start_time = t_min if t_min is not None else data[:, 1].min()
@@ -179,12 +189,29 @@ def optimised_slice(data, dt, TOT=False, t_min=None, t_max=None,
     Npix = 256 * 256 
     slices = []
 
+    total = len(start_times)
+    # initial progress
+    try:
+        progress_callback(0.0, f"Preparing {total} windows")
+    except Exception:
+        pass
     # For each chosen start time, build the image by selecting the detections
     # that fall inside [t0, t0+dt) (TOT mode) or [t0, t0+dt] (binary mode) and
     # assign values vectorized (avoids Python-level loops and repeated work).
     for i, t0 in enumerate(start_times):
+        # allow external stop request
+        try:
+            if callable(stop_requested) and stop_requested():
+                try:
+                    progress_callback(i/total if total else 1.0, "Stopped by request")
+                except Exception:
+                    pass
+                break
+        except Exception:
+            pass
+
         if progress_bar:
-            print(f"Building window {i+1}/{len(start_times)} — start={t0}", end='\r', flush=True)
+            print(f"Building window {i+1}/{len(start_times)}", end='\r', flush=True)
 
         if TOT:
             mask_win = (times >= t0) & (times < (t0 + dt))
@@ -211,7 +238,15 @@ def optimised_slice(data, dt, TOT=False, t_min=None, t_max=None,
             flat_img = np.zeros(Npix, dtype=np.uint8)
             flat_img[flat] = 1
         slices.append(flat_img.reshape((256, 256)))
+
+        try:
+            progress_callback((i+1)/total, f"Building window")
+        except Exception:
+            pass
     if progress_bar:
         print('\n')
-
+    try:
+        progress_callback(1.0, "Slicing complete")
+    except Exception:
+        pass
     return slices

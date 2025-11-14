@@ -126,13 +126,21 @@ def compteur_particles(file = "None", t= 0, d_time = None, plot = False, block =
 
 def compteur_particles_optimized(file = "None", t_min= None,t_max=None, d_time = 150,
                     discrimination_criteria = {"electron_muon":{}},
-                    progress_bar = False
-                    ):
-    
+                    progress_bar = False,progress_callback=None,
+                    stop_requested=None):    
     data = file if not(type(file) == str) else read(file)
     print("Starting slicing...")
 
-    images = optimised_slice(data.to_numpy(), d_time,t_min=t_min,t_max=t_max,progress_bar=progress_bar)
+     # fallback safe callbacks if none provided
+    if progress_callback is None:
+        def progress_callback(progress, message=""):
+            return None
+    if stop_requested is None:
+        def stop_requested():
+            return False
+
+    images = optimised_slice(data.to_numpy(), d_time,t_min=t_min,t_max=t_max,progress_bar=progress_bar,
+                             progress_callback=progress_callback, stop_requested=stop_requested)
 
     # number of windows (optimised_slice returns a list)
     n_windows = len(images)
@@ -142,6 +150,17 @@ def compteur_particles_optimized(file = "None", t_min= None,t_max=None, d_time =
 
     print("\n","Starting optimized counting over", n_windows, "windows.\n")
     for i, image in enumerate(images):
+        # check external stop request
+        try:
+            if callable(stop_requested) and stop_requested():
+                try:
+                    progress_callback(i / n_windows if n_windows else 1.0, "Counting stopped by request")
+                except Exception:
+                    pass
+                break
+        except Exception:
+            pass
+
         if progress_bar:
             print(f"Processed window {i+1}/{n_windows}", end='\r', flush=True)
         counts = compteur_particles(image, is_slice=True,
@@ -153,10 +172,20 @@ def compteur_particles_optimized(file = "None", t_min= None,t_max=None, d_time =
             except Exception:
                 # ignore malformed values and treat as zero
                 pass
+        # report progress for counting stage (fraction of windows done)
+        try:
+            progress_callback((i+1)/n_windows if n_windows else 1.0, f"Counting window")
+        except Exception:
+            pass
 
+    # final progress
+    try:
+        progress_callback(1.0, "Counting complete")
+    except Exception:
+        pass
     # return a results-like dict for compatibility
     return {"Counts": totals, "Images": None}
-
+    
 
 
 

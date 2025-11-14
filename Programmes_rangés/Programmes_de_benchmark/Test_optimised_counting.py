@@ -12,7 +12,7 @@ from Programmes_de_bases.compteur import compteur_particles_optimized
 
 if __name__ == "__main__":
     # Example usage of compteur_particles
-    file = r"C:\Users\Félix\Desktop\Programmation\Projet_cea\Particle_tracking_algorithme_project_M1-2-IN\DATA-20251022T080148Z-1-001\DATA\alpha\60sec_alpha_39kbq_2.5cm_r0.t3pa"
+    file = r"C:\Users\Graziani\Desktop\Projet_CEA\Projet\Particle_tracking_algorithme_project_M1-2-IN\DATA-20251022T080148Z-1-001\DATA\alpha\60sec_alpha_39kbq_2.5cm_r0.t3pa"
      # Replace with your actual file path
     start = time.time()
     t_start = 0.0
