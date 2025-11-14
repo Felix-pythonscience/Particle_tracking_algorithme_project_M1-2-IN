@@ -43,11 +43,19 @@ def slice(data,time,d_time):
     mask = (data[:, 1] >= time) & (data[:, 1] <= time + d_time) # Filtrage des données selon le temps
     data_cut = data[mask]
 
-    for detection in data_cut :  # Boucle pour mettre les pixels à 1
-        index = int(detection[0]) #Laisser -1 pour avoir un index correct si il commence à 1
-        x = index // 256
-        y = index % 256
-        image[x,y] = 1
+      # Vectorised assignment: compute coordinates for all detections then assign
+    # This avoids a Python loop and is significantly faster for many detections.
+    if data_cut.size == 0:
+        return image  # return empty image if no data in time window
+    indices = data_cut[:, 0].astype(np.int64)
+    # clip indices to valid range in case of malformed input
+    indices = np.clip(indices, 0, 256 * 256 - 1)
+    xs = indices // 256
+    ys = indices % 256
+    values = np.ones_like(data_cut[:, 2])
+    # advanced (fancy) indexing: later entries in values will overwrite earlier
+    # ones at the same (x,y), which matches the behaviour of the explicit loop
+    image[xs, ys] = values
     return image
 
 def slice_Tot(data,time,d_time):
@@ -73,12 +81,135 @@ def slice_Tot(data,time,d_time):
     """
     image = np.zeros((256,256)) #Création image vide 
 
-    mask = (data[:, 1] >= time) & (data[:, 1] <= time + d_time) # Filtrage des données selon le temps
+    mask = (data[:, 1] >= time) & (data[:, 1] < time + d_time) # Filtrage des données selon le temps
     data_cut = data[mask]
 
-    for detection in data_cut :  # Boucle pour mettre les pixels à 1
-        index = int(detection[0]) #Laisser -1 pour avoir un index correct si il commence à 1
-        x = index // 256
-        y = index % 256
-        image[x,y] = detection[2]
+    # Vectorised assignment: compute coordinates for all detections then assign
+    # This avoids a Python loop and is significantly faster for many detections.
+    if data_cut.size == 0:
+        return image  # return empty image if no data in time window
+    indices = data_cut[:, 0].astype(np.int64)
+    # clip indices to valid range in case of malformed input
+    indices = np.clip(indices, 0, 256 * 256 - 1)
+    xs = indices // 256
+    ys = indices % 256
+    values = data_cut[:, 2]
+    # advanced (fancy) indexing: later entries in values will overwrite earlier
+    # ones at the same (x,y), which matches the behaviour of the explicit loop
+    image[xs, ys] = values
     return image
+
+
+def optimised_slice(data,dt,TOT=False,t_min=None,t_max=None,progress_bar=False):
+    """Slice the input detections into multiple time-window images.
+
+    This function examines the timestamps present in ``data`` and builds a list
+    of 256x256 images (binary or TOT-valued depending on ``TOT``) where each
+    image corresponds to a time window of duration ``dt`` starting at selected
+    time points. The intent is to avoid producing overlapping windows for
+    time points that are closer than ``dt``.
+
+    Behavior summary
+    - If ``TOT`` is False (default) the helper ``slice`` is used to produce
+      binary images (0/1). If ``TOT`` is True the helper ``slice_Tot`` is
+      used to place TOT values into the images.
+    - The function first determines the unique timestamp values within the
+      optional interval [``t_min``, ``t_max``] (or over the whole dataset if
+      they are not provided).
+    - It then iterates through the sorted unique timestamps and creates a
+      window image at the first timestamp and thereafter whenever the next
+      timestamp is more than ``dt`` after the current one. This ensures
+      successive windows start at timestamp locations spaced by at least ``dt``.
+
+    Parameters
+    ----------
+    data : ndarray
+        NxM array with detection rows. Column 0 is the pixel index, column 1 is time
+        and column 2 (if present) may be TOT/intensity used by ``slice_Tot``.
+    dt : float
+        Duration of each time window.
+    TOT : bool, optional
+        If True use ``slice_Tot`` (store TOT values), otherwise use the
+        binary ``slice`` function. Default False.
+    t_min, t_max : float, optional
+        If provided, restrict the analyzed timestamps to the interval
+        [t_min, t_max]. By default the full min/max from data[:,1] is used.
+
+    Returns
+    -------
+    list of ndarray
+        List of 256x256 images (dtype float) corresponding to selected windows.
+
+    Notes / edge cases
+    -------------------
+    - If no timestamps fall inside [t_min, t_max] an empty list is returned.
+    - This function relies on the helper functions ``slice`` and ``slice_Tot``
+      defined in this module.
+    - The function uses unique timestamps as potential window starts; it does
+      not generate a dense tiling of windows.
+    """
+
+    # determine time interval to consider
+    start_time = t_min if t_min is not None else data[:, 1].min()
+    end_time = t_max if t_max is not None else data[:, 1].max()
+
+    # restrict to points inside interval and extract arrays we'll reuse
+    in_interval = (data[:, 1] >= start_time) & (data[:, 1] <= end_time)
+    if not np.any(in_interval):
+        return []
+
+    times = data[in_interval, 1]
+    indices_all = data[in_interval, 0].astype(np.int64)
+    # values (TOT) may be present in column 2; keep reference even for binary mode
+    values_all = data[in_interval, 2]
+
+    # unique sorted candidate start times
+    cutting_points = np.unique(times)
+    if cutting_points.size == 0:
+        return []
+
+    # choose starting timestamps spaced by at least dt (vectorized selection)
+    # always include the first unique timestamp
+    gaps = np.diff(cutting_points)
+    starts_idx = np.concatenate(([0], np.nonzero(gaps > dt)[0] + 1))
+    start_times = cutting_points[starts_idx]
+
+    Npix = 256 * 256 
+    slices = []
+
+    # For each chosen start time, build the image by selecting the detections
+    # that fall inside [t0, t0+dt) (TOT mode) or [t0, t0+dt] (binary mode) and
+    # assign values vectorized (avoids Python-level loops and repeated work).
+    for i, t0 in enumerate(start_times):
+        if progress_bar:
+            print(f"Building window {i+1}/{len(start_times)} — start={t0}", end='\r', flush=True)
+
+        if TOT:
+            mask_win = (times >= t0) & (times < (t0 + dt))
+        else:
+            mask_win = (times >= t0) & (times < (t0 + dt))
+
+        if not np.any(mask_win):
+            # empty window -> zero image
+            slices.append(np.zeros((256, 256)))
+            continue
+
+        idxs = indices_all[mask_win]
+        # clip indices to valid domain
+        idxs = np.clip(idxs, 0, Npix-1)
+        flat = idxs.astype(np.int64)
+
+        if TOT:
+            vals = values_all[mask_win]
+            # create flat image and assign values (last-write wins w.r.t. data order)
+            flat_img = np.zeros(Npix, dtype=vals.dtype)
+            flat_img[flat] = vals
+        else:
+            # binary image: a hit sets pixel to 1
+            flat_img = np.zeros(Npix, dtype=np.uint8)
+            flat_img[flat] = 1
+        slices.append(flat_img.reshape((256, 256))) 
+    if progress_bar:
+        print('\n')
+
+    return slices

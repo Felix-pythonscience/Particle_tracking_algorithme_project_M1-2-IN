@@ -6,7 +6,7 @@ parent_dir = Path(__file__).resolve().parent.parent
 sys.path.append(str(parent_dir))
 try:
     # allow running as part of a package (preferred)
-    from .read_file import read, slice, slice_Tot
+    from .read_file import read, slice, slice_Tot,optimised_slice
     from .filtres import filtre_alpha, filtre_tracks
     from .plot_results import plot_results
     from .event_detector_v3 import event_counting_alpha, event_counting_electron_muon,event_counting_photon
@@ -15,7 +15,7 @@ try:
 except Exception:
     # fallback when the module is executed directly as a script
     # attempt to import from the same directory
-    from read_file import read, slice, slice_Tot
+    from read_file import read, slice, slice_Tot,optimised_slice
     from filtres import filtre_alpha, filtre_tracks
     from plot_results import plot_results
     from event_detector_v3 import event_counting_alpha, event_counting_electron_muon,event_counting_photon
@@ -26,7 +26,7 @@ except Exception:
 def compteur_particles(file = "None", t= 0, d_time = None, plot = False, block = False,
                     return_images=False, is_slice = False,save = [False,"plot_results.png",Path.cwd()],
                     discrimination_criteria = {"electron_muon":{}},
-                    loop=0):
+                    ):
     """Count particle types in a time window and optionally plot the results.
 
     This function reads the data (or accepts an already-loaded DataFrame/array),
@@ -123,6 +123,41 @@ def compteur_particles(file = "None", t= 0, d_time = None, plot = False, block =
 
 
     return results
+
+def compteur_particles_optimized(file = "None", t_min= None,t_max=None, d_time = 150,
+                    discrimination_criteria = {"electron_muon":{}},
+                    progress_bar = False
+                    ):
+    
+    data = file if not(type(file) == str) else read(file)
+    print("Starting slicing...")
+
+    images = optimised_slice(data.to_numpy(), d_time,t_min=t_min,t_max=t_max,progress_bar=progress_bar)
+
+    # number of windows (optimised_slice returns a list)
+    n_windows = len(images)
+
+    # accumulate totals in a dict for clarity and extensibility
+    totals = {"alpha": 0, "electrons": 0, "muons": 0, "gamma": 0}
+
+    print("\n","Starting optimized counting over", n_windows, "windows.\n")
+    for i, image in enumerate(images):
+        if progress_bar:
+            print(f"Processed window {i+1}/{n_windows}", end='\r', flush=True)
+        counts = compteur_particles(image, is_slice=True,
+                    discrimination_criteria=discrimination_criteria).get("Counts", {})
+        
+        for k in totals.keys():
+            try:
+                totals[k] += int(counts.get(k, 0) or 0)
+            except Exception:
+                # ignore malformed values and treat as zero
+                pass
+
+    # return a results-like dict for compatibility
+    return {"Counts": totals, "Images": None}
+
+
 
 
 
