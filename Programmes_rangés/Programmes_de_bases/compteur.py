@@ -1,6 +1,7 @@
 import numpy as np
 from pathlib import Path
 import sys
+import time
 parent_dir = Path(__file__).resolve().parent.parent
 sys.path.append(str(parent_dir))
 try:
@@ -24,7 +25,8 @@ except Exception:
 
 def compteur_particles(file = "None", t= 0, d_time = None, plot = False, block = False,
                     return_images=False, is_slice = False,save = [False,"plot_results.png",Path.cwd()],
-                    discrimination_criteria = {"alpha":{}, "electron_muon":{}}):
+                    discrimination_criteria = {"electron_muon":{}},
+                    loop=0):
     """Count particle types in a time window and optionally plot the results.
 
     This function reads the data (or accepts an already-loaded DataFrame/array),
@@ -66,20 +68,21 @@ def compteur_particles(file = "None", t= 0, d_time = None, plot = False, block =
         image = file
     else:
         data = file if not(type(file) == str) else read(file)
-        d_time = d_time if d_time!=None else 150000000  # Diviser le temps
+        d_time = d_time if d_time!=None else 15e6  # Diviser le temps
 
         image = slice(data.to_numpy(), t, d_time)
 
-    # Morphological filtering
+    # Morphological filtering of alpha
     image_without_alpha, image_alpha = filtre_alpha(image)# Appliquer le filtre pour enlever les tracks
 
-    image_gamma, image_tracks = filtre_tracks(image_without_alpha)# Appliquer le filtre pour enlever les tracks
-
-
-
-    #Counting particles + cluster based filtering
+    
+    #Counting particles + cluster based filtering of alpha
 
     N_alpha = event_counting_alpha(image_alpha)
+    #filtering of tracks
+    # Appliquer le filtre pour enlever les tracks
+    image_gamma, image_tracks = filtre_tracks(image_without_alpha)
+
 
     N_electrons , N_muons, N_alpha_corr = event_counting_electron_muon(electron_muon_matrix = image_tracks,
                                                                        eccentricity_threshold=discrimination_criteria["electron_muon"].get("eccentricity_threshold", 0.99),
@@ -91,18 +94,18 @@ def compteur_particles(file = "None", t= 0, d_time = None, plot = False, block =
     N_gamma = event_counting_photon(image_gamma)
 
 
-    results ={"Counts": {
+    results = {"Counts": {
                 "alpha": N_alpha,
                 "electrons": N_electrons,
                 "muons": N_muons,
                 "gamma": N_gamma
             },
-            "Images": {
+            "Images": None if not return_images else {
                 "original": image,
                 "alpha": image_alpha,
                 "tracks": image_tracks,
                 "gamma": image_gamma
-            } if return_images else None
+            }
             }
 
     if plot:
@@ -121,16 +124,34 @@ def compteur_particles(file = "None", t= 0, d_time = None, plot = False, block =
 
     return results
 
+
+
 if __name__ == "__main__":
     # Lecture des données et création de l'image binaire
     #file = "C:/Users/Graziani/Desktop/Projet CEA/Particle_tracking_algorithme_project_M1-2-IN/DATA-20251022T080148Z-1-001/DATA/alpha/60sec_alpha_39kbq_2.5cm_r0.t3pa"
-    file = "C:/Users/Félix/Desktop/Programmation/Projet_cea/Particle_tracking_algorithme_project_M1-2-IN/DATA-20251022T080148Z-1-001/DATA/beta_SrY/5min_beta_SrY_3cm_ground_source/5min_beta_SrY_3cm_ground_source_r1.t3pa"
-   
-    #Counting particles
-    counts = compteur_particles(file, t=0, d_time=1500000, plot=True, block=True, save=[True,"Test_alpha",Path.cwd()])
-    #spliting results
-    N_alpha, N_electrons, N_muons, N_gamma = counts["Counts"]["alpha"], counts["Counts"]["electrons"], counts["Counts"]["muons"], counts["Counts"]["gamma"]
-    print(f"Nombre de particules alpha détectées : {N_alpha}")
-    print(f"Nombre de particules électrons détectées : {N_electrons}")
-    print(f"Nombre de particules muons détectées : {N_muons}")
-    print(f"Nombre de particules gamma détectées : {N_gamma}")
+    #file = "C:/Users/Graziani/Desktop/Projet_CEA/Projet/Particle_tracking_algorithme_project_M1-2-IN/DATA-20251022T080148Z-1-001/DATA/Combined_Am_SrY/2.5cm/2.5cm_r0.t3pa"
+    #file = "C:/Users/Graziani/Desktop/Projet_CEA/Projet/Particle_tracking_algorithme_project_M1-2-IN/DATA-20251022T080148Z-1-001/DATA/alpha/60sec_alpha_39kbq_2.5cm_r0.t3pa"
+    file = "C:/Users/Graziani/Desktop/Projet_CEA\Projet\Particle_tracking_algorithme_project_M1-2-IN/DATA-20251022T080148Z-1-001/DATA/beta_SrY/5min_beta_SrY_2cm_ground_source/5min_beta_SrY_2cm_ground_source_prise2_r0.t3pa"
+    data = read(file)
+    dt = 1.5E7
+    n_windows = int(np.ceil(data.iloc[:, 1].max() / dt)) if dt > 0 else 1
+    N_alpha_total = 0
+    N_electrons_total = 0      
+    N_muons_total = 0
+    N_gamma_total = 0
+    time_start = time.time()
+    for i in range(n_windows):
+        counts = compteur_particles(file, t=i*dt, d_time=dt, plot=False, block=False, save=[False,"Test_alpha_qui_passe_pour_dafuk",Path.cwd()])
+        #spliting results
+        N_alpha, N_electrons, N_muons, N_gamma = counts["Counts"]["alpha"], counts["Counts"]["electrons"], counts["Counts"]["muons"], counts["Counts"]["gamma"]
+        N_alpha_total += N_alpha
+        N_electrons_total += N_electrons
+        N_muons_total += N_muons
+        N_gamma_total += N_gamma
+        print(f"Fenêtre {i+1}/{n_windows} en {time.time() - time_start:.2f}s : Alpha={N_alpha}, Electrons={N_electrons}, Muons={N_muons}, Gamma={N_gamma}", end='\r', flush=True)
+    print("\nRésultats totaux sur toutes les fenêtres temporelles :")
+    print(f"Temps total de traitement : {time.time() - time_start:.2f}s")
+    print(f"Nombre de particules alpha détectées : {N_alpha_total}")
+    print(f"Nombre de particules électrons détectées : {N_electrons_total}")
+    print(f"Nombre de particules muons détectées : {N_muons_total}")
+    print(f"Nombre de particules gamma détectées : {N_gamma_total}")

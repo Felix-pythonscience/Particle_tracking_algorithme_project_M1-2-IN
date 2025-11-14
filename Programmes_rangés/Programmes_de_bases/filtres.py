@@ -71,6 +71,21 @@ def filtre_alpha(image):
     return image_without_alpha, image_alpha
 
 def filtre_tracks(image):
+    """
+    Morphological filtering to separate tracks (electrons/muons) from the image.
+    Parameters
+    ----------
+    image : ndarray
+        Input image to filter.
+    falses_alphas : ndarray, optional
+        Optional mask of false alphas to include in tracks.
+    Returns
+    -------
+    tuple
+        (image_without_tracks, image_tracks) as uint8 arrays.
+
+    """
+    ## filtering of tracks
     # Kernel vertical et horizontal
     structure_verticale = np.ones((1, 4), dtype=np.uint8)
     structure_horizontale = np.ones((4, 1), dtype=np.uint8)
