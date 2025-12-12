@@ -104,6 +104,9 @@ class MainWindow(QMainWindow):
         # state
         self.selected_file = None
         self.worker = None
+        self.progress_phase = "slicing"
+        self.last_pct = 0
+        self.cancelled = False
 
         # central widget + main vertical layout
         central = QWidget()
@@ -126,6 +129,12 @@ class MainWindow(QMainWindow):
         self.btn_run = QPushButton("Run counting")
         self.btn_run.clicked.connect(self.run_counting)
         ctrl_layout.addWidget(self.btn_run)
+
+        # Bouton d'annulation, actif uniquement pendant un traitement
+        self.btn_cancel = QPushButton("Annuler")
+        self.btn_cancel.setEnabled(False)
+        self.btn_cancel.clicked.connect(self.cancel_counting)
+        ctrl_layout.addWidget(self.btn_cancel)
 
         main_layout.addLayout(ctrl_layout)
 
@@ -168,37 +177,64 @@ class MainWindow(QMainWindow):
         self.status.setContentsMargins(0, 0, 0, 0)
         main_layout.addWidget(self.status, alignment=Qt.AlignLeft)
 
-        # Title for the progress area (user requested "bar de progression")
-        self.progress_title = QLabel("Bar de progression")
+        # Zone de progression (slicing + comptage)
+        self.progress_title = QLabel("Barres de progression")
         self.progress_title.setStyleSheet("font-size:12px; font-weight:600; color: #111;")
         main_layout.addWidget(self.progress_title, alignment=Qt.AlignLeft)
 
-        # Literal progress bar (range 0..200, fills in green) with white background and visible black text
-        self.progress_bar = QProgressBar()
-        self.progress_bar.setRange(0, 200)           # "10 par 200" expressed as 0..200 steps
-        self.progress_bar.setValue(0)
-        self.progress_bar.setTextVisible(True)       # ensure text is visible inside the bar
-        # hauteur réduite pour paraître plus serrée avec le status
-        self.progress_bar.setFixedHeight(18)
-        # style : fond blanc, texte noir, chunk vert
-        self.progress_bar.setStyleSheet("""
+        self.slice_label = QLabel("Slicing")
+        self.slice_label.setStyleSheet("font-size:12px; font-weight:600; color: #111; margin-top:4px;")
+        main_layout.addWidget(self.slice_label, alignment=Qt.AlignLeft)
+
+        self.slice_progress = QProgressBar()
+        self.slice_progress.setRange(0, 100)
+        self.slice_progress.setValue(0)
+        self.slice_progress.setTextVisible(True)
+        self.slice_progress.setFixedHeight(18)
+        self.slice_progress.setStyleSheet("""
             QProgressBar {
                 border: 1px solid #bbb;
                 background: #ffffff;
                 height: 18px;
                 border-radius: 4px;
-                color: #000000;           /* text color inside the bar */
-                padding-left: 6px;
-                padding-right: 6px;
+                color: #000000;
+                padding: 0px;
+                text-align: center;
             }
             QProgressBar::chunk {
-                background-color: #4caf50; /* green chunk */
+                background-color: #4caf50;
                 margin: 0px;
             }
         """)
-        # default text format (will be overwritten by setFormat in _on_progress)
-        self.progress_bar.setFormat("%p%")
-        main_layout.addWidget(self.progress_bar)
+        self.slice_progress.setFormat("%p%")
+        main_layout.addWidget(self.slice_progress)
+
+        self.count_label = QLabel("Comptage")
+        self.count_label.setStyleSheet("font-size:12px; font-weight:600; color: #111; margin-top:4px;")
+        main_layout.addWidget(self.count_label, alignment=Qt.AlignLeft)
+
+        self.count_progress = QProgressBar()
+        self.count_progress.setRange(0, 100)
+        self.count_progress.setValue(0)
+        self.count_progress.setTextVisible(True)
+        self.count_progress.setFixedHeight(18)
+        self.count_progress.setStyleSheet("""
+            QProgressBar {
+                border: 1px solid #bbb;
+                background: #ffffff;
+                height: 18px;
+                border-radius: 4px;
+                color: #000000;
+                padding: 0px;
+                text-align: center;
+            }
+            QProgressBar::chunk {
+                background-color: #4caf50;
+                margin: 0px;
+            }
+        """)
+        self.count_progress.setFormat("%p%")
+        main_layout.addWidget(self.count_progress)
         
 
     # ------------------ UI actions ------------------
@@ -253,11 +289,34 @@ class MainWindow(QMainWindow):
         self.btn_run.setEnabled(False)
         self.btn_select.setEnabled(False)
         self.status.setText("Running...")
+        # reset progress bars
+        for bar in (self.slice_progress, self.count_progress):
+            bar.setValue(0)
+            bar.setFormat("0%")
+        self.progress_phase = "slicing"
+        self.last_pct = 0
+        self.cancelled = False
         self.worker = CountWorker(self.selected_file)
         self.worker.finished.connect(self._on_finished)
         self.worker.error.connect(self._on_error)
         self.worker.progress.connect(self._on_progress)   # connect progress
         self.worker.start()
+        self.btn_cancel.setEnabled(True)
+
+    def cancel_counting(self):
+        """Demande l'annulation du comptage en cours."""
+        if self.worker is None or not self.worker.isRunning():
+            return
+        self.status.setText("Annulation en cours...")
+        self.btn_cancel.setEnabled(False)
+        try:
+            self.worker.requestInterruption()
+            # Optionnel : indiquer dans la barre de progression
+            self.slice_progress.setFormat("Annulation demandée...")
+            self.count_progress.setFormat("Annulation demandée...")
+            self.cancelled = True
+        except Exception:
+            pass
 
     def _on_finished(self, results: dict):
         """Update the result labels with the counts returned by the worker."""
@@ -265,15 +324,35 @@ class MainWindow(QMainWindow):
         for k, lbl in self.result_labels.items():
             v = counts.get(k, '-')
             lbl.setText(str(v))
-        self.status.setText("Done")
+        # Si annulé, on laisse les barres à leur valeur courante
+        if self.cancelled:
+            self.status.setText("Cancelled")
+            self.slice_progress.setFormat("Annulé")
+            self.count_progress.setFormat("Annulé")
+        else:
+            self.status.setText("Done")
+            self.slice_progress.setValue(100)
+            self.slice_progress.setFormat("Terminé")
+            self.count_progress.setValue(100)
+            self.count_progress.setFormat("Terminé")
         self.btn_run.setEnabled(True)
         self.btn_select.setEnabled(True)
+        self.btn_cancel.setEnabled(False)
+        self.worker = None
+        self.progress_phase = "slicing"
+        self.last_pct = 0
+        self.cancelled = False
 
     def _on_error(self, msg: str):
         """Handle worker errors by reporting and re-enabling the UI."""
         self.status.setText(f"Error: {msg}")
         self.btn_run.setEnabled(True)
         self.btn_select.setEnabled(True)
+        self.btn_cancel.setEnabled(False)
+        self.worker = None
+        self.progress_phase = "slicing"
+        self.last_pct = 0
+        self.cancelled = False
 
     def _on_progress(self, progress: float, message: str):
         """Update the status bar with progress from the worker.
@@ -289,21 +368,24 @@ class MainWindow(QMainWindow):
             p = 0.0
             pct = 0
 
-        # map progress [0.0..1.0] to progress_bar [0..200]
-        try:
-            v = int(round(p * 200))
-        except Exception:
-            v = 0
+        # Déterminer la phase (slicing ou comptage)
+        msg = str(message or "")
+        lower_msg = msg.lower()
+        slice_kw = ("slice", "slicing", "preproc", "pre-proc", "extraction", "cluster")
+        count_kw = ("count", "compt", "analyse", "counting", "compteur", "particle")
 
-        # Set the numeric value and show the message + percent inside the bar
-        try:
-            self.progress_bar.setValue(v)
-            # Put the message inside the progress bar text (fallback to percent if message empty)
-            display_msg = f"{message} ({pct}%)" if message else f"{pct}%"
-            # Use setFormat to display arbitrary text
-            self.progress_bar.setFormat(display_msg)
-        except Exception:
-            pass
+        if any(k in lower_msg for k in slice_kw):
+            self.progress_phase = "slicing"
+        elif any(k in lower_msg for k in count_kw):
+            self.progress_phase = "counting"
+
+        target_bar = self.slice_progress if self.progress_phase == "slicing" else self.count_progress
+
+        # Mettre à jour la barre choisie
+        target_bar.setValue(pct)
+        display_msg = f"{msg} ({pct}%)" if msg else f"{pct}%"
+        target_bar.setFormat(display_msg)
+        self.last_pct = pct
 
 def main():
     app = QApplication(sys.argv)
