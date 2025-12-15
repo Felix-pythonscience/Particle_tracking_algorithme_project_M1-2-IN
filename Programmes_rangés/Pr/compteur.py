@@ -125,11 +125,9 @@ def compteur_particles(file = "None", t= 0, d_time = None, plot = False, block =
     return results
 
 def compteur_particles_optimized(file = "None", t_min= None,t_max=None, d_time = 150,
-                    is_sliced = False, return_slice = False, return_images = False,
                     discrimination_criteria = {"electron_muon":{}},
                     progress_bar = False,progress_callback=None,
-                    stop_requested=None):
-
+                    stop_requested=None):    
     data = file if not(type(file) == str) else read(file)
     print("Starting slicing...")
 
@@ -140,10 +138,8 @@ def compteur_particles_optimized(file = "None", t_min= None,t_max=None, d_time =
     if stop_requested is None:
         def stop_requested():
             return False
-    if is_sliced:
-        images = file
-    else:
-        images = optimised_slice(data.to_numpy(), d_time,t_min=t_min,t_max=t_max,progress_bar=progress_bar,
+
+    images = optimised_slice(data.to_numpy(), d_time,t_min=t_min,t_max=t_max,progress_bar=progress_bar,
                              progress_callback=progress_callback, stop_requested=stop_requested)
 
     # number of windows (optimised_slice returns a list)
@@ -167,12 +163,8 @@ def compteur_particles_optimized(file = "None", t_min= None,t_max=None, d_time =
 
         if progress_bar:
             print(f"Processed window {i+1}/{n_windows}", end='\r', flush=True)
-        results = compteur_particles(image, is_slice=True,
-                    discrimination_criteria=discrimination_criteria)
-
-        counts = results.get("Counts", {})
-        images = results.get("Images", None)
-        
+        counts = compteur_particles(image, is_slice=True,
+                    discrimination_criteria=discrimination_criteria).get("Counts", {})
         
         for k in totals.keys():
             try:
@@ -192,7 +184,7 @@ def compteur_particles_optimized(file = "None", t_min= None,t_max=None, d_time =
     except Exception:
         pass
     # return a results-like dict for compatibility
-    return {"Counts": totals, "Images": images if return_images else None, "Slices": images if return_slice else None}
+    return {"Counts": totals, "Images": None}
     
 
 

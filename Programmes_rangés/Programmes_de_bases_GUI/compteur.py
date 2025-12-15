@@ -68,7 +68,7 @@ def compteur_particles(file = "None", t= 0, d_time = None, plot = False, block =
         image = file
     else:
         data = file if not(type(file) == str) else read(file)
-        d_time = d_time if d_time!=None else 15e6  # Diviser le temps
+        d_time = d_time if d_time!=None else 150  # Diviser le temps
 
         image = slice(data.to_numpy(), t, d_time)
 
@@ -205,7 +205,7 @@ if __name__ == "__main__":
     #file = "C:/Users/Graziani/Desktop/Projet_CEA/Projet/Particle_tracking_algorithme_project_M1-2-IN/DATA-20251022T080148Z-1-001/DATA/alpha/60sec_alpha_39kbq_2.5cm_r0.t3pa"
     file = "C:/Users/Graziani/Desktop/Projet_CEA/Projet/Particle_tracking_algorithme_project_M1-2-IN/DATA-20251022T080148Z-1-001/DATA/beta_SrY/5min_beta_SrY_2cm_ground_source/5min_beta_SrY_2cm_ground_source_prise2_r0.t3pa"
     data = read(file)
-    dt = 1.5E7
+    dt = 150
     n_windows = int(np.ceil(data.iloc[:, 1].max() / dt)) if dt > 0 else 1
     N_alpha_total = 0
     N_electrons_total = 0      
