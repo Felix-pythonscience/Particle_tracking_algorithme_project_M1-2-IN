@@ -102,7 +102,8 @@ def slice_Tot(data,t,d_time):
 
 def optimised_slice(data, dt, TOT=False, t_min=None, t_max=None,
                     progress_bar=False, progress_callback=None,
-                      stop_requested=None):
+                    return_data_t_max=False,
+                    stop_requested=None):
      
     """Slice the input detections into multiple time-window images.
 
@@ -249,4 +250,8 @@ def optimised_slice(data, dt, TOT=False, t_min=None, t_max=None,
         progress_callback(1.0, "Slicing complete")
     except Exception:
         pass
-    return slices
+    # Build return tuple with start_times included
+    result = (slices, start_times) if len(slices) > 0 else (slices, np.array([]))
+    if return_data_t_max:
+        return result, data[:, 1].max()
+    return result

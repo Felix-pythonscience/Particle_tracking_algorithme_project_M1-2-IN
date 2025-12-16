@@ -9,7 +9,7 @@ try:
     from .read_file import read, slice, slice_Tot,optimised_slice
     from .filtres import filtre_alpha, filtre_tracks
     from .plot_results import plot_results
-    from .event_detector_v3 import event_counting_alpha, event_counting_electron_muon,event_counting_photon
+    from .event_detector_v3_2 import event_counting_alpha, event_counting_electron_muon,event_counting_photon
     # diagnostic: indicate which import branch succeeded
    
 except Exception:
@@ -18,7 +18,7 @@ except Exception:
     from read_file import read, slice, slice_Tot,optimised_slice
     from filtres import filtre_alpha, filtre_tracks
     from plot_results import plot_results
-    from event_detector_v3 import event_counting_alpha, event_counting_electron_muon,event_counting_photon
+    from event_detector_v3_2 import event_counting_alpha, event_counting_electron_muon,event_counting_photon
     # diagnostic: indicate fallback import used
    
 
@@ -84,10 +84,14 @@ def compteur_particles(file = "None", t= 0, d_time = None, plot = False, block =
     image_gamma, image_tracks = filtre_tracks(image_without_alpha)
 
 
-    N_electrons , N_muons, N_alpha_corr = event_counting_electron_muon(electron_muon_matrix = image_tracks,
-                                                                       eccentricity_threshold=discrimination_criteria["electron_muon"].get("eccentricity_threshold", 0.99),
-                                                                       solidity_threshold=discrimination_criteria["electron_muon"].get("solidity_threshold", 0.99),
-                                                                       area_threshold=discrimination_criteria["electron_muon"].get("area_threshold", 10))
+    N_electrons , N_muons, N_alpha_corr, _ = event_counting_electron_muon(
+                                                                       electron_muon_matrix=image_tracks,
+                                                                       eccentricity_threshold_muon=discrimination_criteria["electron_muon"].get("eccentricity_threshold_muon", 0.99),
+                                                                       area_threshold_muon=discrimination_criteria["electron_muon"].get("area_threshold_muon", 25),
+                                                                       eccentricity_threshold_alpha=discrimination_criteria["electron_muon"].get("eccentricity_threshold_alpha", 0.70),
+                                                                       solidity_threshold_alpha=discrimination_criteria["electron_muon"].get("solidity_threshold_alpha", 1),
+                                                                       area_threshold_alpha=discrimination_criteria["electron_muon"].get("area_threshold_alpha", 9))
+    
 
     N_alpha += N_alpha_corr
 
@@ -125,10 +129,18 @@ def compteur_particles(file = "None", t= 0, d_time = None, plot = False, block =
     return results
 
 def compteur_particles_optimized(file = "None", t_min= None,t_max=None, d_time = 150,
-                    is_sliced = False, return_slice = False, return_images = False,
+                    is_sliced = False, return_slice = False, return_images = False,return_data_t_max=False,
                     discrimination_criteria = {"electron_muon":{}},
                     progress_bar = False,progress_callback=None,
-                    stop_requested=None):
+                    stop_requested=None,
+                    single_window=False):
+    """
+    Comptage optimisé de particules.
+    
+    Args:
+        single_window: Si True, traite [t_min, t_max] comme une seule fenêtre (pour visualisation).
+                      Si False, découpe en plusieurs fenêtres de taille d_time (mode global).
+    """
 
     data = file if not(type(file) == str) else read(file)
     print("Starting slicing...")
@@ -140,17 +152,58 @@ def compteur_particles_optimized(file = "None", t_min= None,t_max=None, d_time =
     if stop_requested is None:
         def stop_requested():
             return False
+    
+    # Initialize data_t_max_value to None
+    data_t_max_value = None
+    
     if is_sliced:
         images = file
+    elif single_window:
+        # Mode visualisation: une seule fenêtre [t_min, t_max]
+        progress_callback(0.1, "Slicing single window")
+        window_start = t_min if t_min is not None else 0.0
+        window_end = t_max if t_max is not None else data.iloc[:, 1].max()
+        data_t_max_value = data.iloc[:, 1].max() if return_data_t_max else None
+        
+        # Créer une seule image pour la fenêtre
+        image = slice(data.to_numpy(), window_start, window_end - window_start)
+        images = [image]
+        progress_callback(1.0, "Slicing complete")
     else:
-        images = optimised_slice(data.to_numpy(), d_time,t_min=t_min,t_max=t_max,progress_bar=progress_bar,
-                             progress_callback=progress_callback, stop_requested=stop_requested)
+        # Mode global: plusieurs fenêtres
+        images_build = optimised_slice(data.to_numpy(), d_time,t_min=t_min,t_max=t_max,progress_bar=progress_bar,
+                                 return_data_t_max=return_data_t_max,
+                                 progress_callback=progress_callback, stop_requested=stop_requested,)
+        slice_start_times = None
+        if return_data_t_max:
+            # Vérifier que c'est bien un tuple ((slices, times), data_t_max)
+            if isinstance(images_build, tuple) and len(images_build) == 2:
+                slices_and_times, data_t_max_value = images_build
+                if isinstance(slices_and_times, tuple) and len(slices_and_times) == 2:
+                    images, slice_start_times = slices_and_times
+                else:
+                    images = slices_and_times if isinstance(slices_and_times, list) else []
+            else:
+                images = images_build if isinstance(images_build, list) else []
+                data_t_max_value = None
+        else:
+            # No return_data_t_max: expect (slices, times) tuple
+            if isinstance(images_build, tuple) and len(images_build) == 2:
+                images, slice_start_times = images_build
+            else:
+                images = images_build if isinstance(images_build, list) else []
 
     # number of windows (optimised_slice returns a list)
     n_windows = len(images)
 
     # accumulate totals in a dict for clarity and extensibility
     totals = {"alpha": 0, "electrons": 0, "muons": 0, "gamma": 0}
+    
+    # Store images from last window if requested
+    last_images = None
+    
+    # Store slice start times for reuse in visualisation
+    slice_times_for_return = slice_start_times
 
     print("\n","Starting optimized counting over", n_windows, "windows.\n")
     for i, image in enumerate(images):
@@ -168,10 +221,15 @@ def compteur_particles_optimized(file = "None", t_min= None,t_max=None, d_time =
         if progress_bar:
             print(f"Processed window {i+1}/{n_windows}", end='\r', flush=True)
         results = compteur_particles(image, is_slice=True,
+                    return_images=return_images,  # Passer le paramètre return_images
                     discrimination_criteria=discrimination_criteria)
 
         counts = results.get("Counts", {})
-        images = results.get("Images", None)
+        result_images = results.get("Images", None)
+        
+        # Store images from the last (or only) window
+        if return_images and result_images is not None:
+            last_images = result_images
         
         
         for k in totals.keys():
@@ -192,7 +250,7 @@ def compteur_particles_optimized(file = "None", t_min= None,t_max=None, d_time =
     except Exception:
         pass
     # return a results-like dict for compatibility
-    return {"Counts": totals, "Images": images if return_images else None, "Slices": images if return_slice else None}
+    return {"Counts": totals, "Images": last_images if return_images else None, "Slices": images if return_slice else None, "SliceTimes": slice_times_for_return if return_slice else None, "data_t_max": data_t_max_value}
     
 
 
@@ -200,10 +258,8 @@ def compteur_particles_optimized(file = "None", t_min= None,t_max=None, d_time =
 
 if __name__ == "__main__":
     # Lecture des données et création de l'image binaire
-    #file = "C:/Users/Graziani/Desktop/Projet CEA/Particle_tracking_algorithme_project_M1-2-IN/DATA-20251022T080148Z-1-001/DATA/alpha/60sec_alpha_39kbq_2.5cm_r0.t3pa"
-    #file = "C:/Users/Graziani/Desktop/Projet_CEA/Projet/Particle_tracking_algorithme_project_M1-2-IN/DATA-20251022T080148Z-1-001/DATA/Combined_Am_SrY/2.5cm/2.5cm_r0.t3pa"
-    #file = "C:/Users/Graziani/Desktop/Projet_CEA/Projet/Particle_tracking_algorithme_project_M1-2-IN/DATA-20251022T080148Z-1-001/DATA/alpha/60sec_alpha_39kbq_2.5cm_r0.t3pa"
-    file = "C:/Users/Graziani/Desktop/Projet_CEA/Projet/Particle_tracking_algorithme_project_M1-2-IN/DATA-20251022T080148Z-1-001/DATA/beta_SrY/5min_beta_SrY_2cm_ground_source/5min_beta_SrY_2cm_ground_source_prise2_r0.t3pa"
+    file = "C:/Users/Félix/Desktop/Programmation/Projet_cea/Particle_tracking_algorithme_project_M1-2-IN/DATA-20251022T080148Z-1-001/DATA/alpha/60sec_alpha_39kbq_2.5cm_r0.t3pa"
+    
     data = read(file)
     dt = 150
     n_windows = int(np.ceil(data.iloc[:, 1].max() / dt)) if dt > 0 else 1
