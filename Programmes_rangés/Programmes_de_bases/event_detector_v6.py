@@ -11,6 +11,8 @@ import matplotlib.pyplot as plt
 from skimage.measure import regionprops_table
 
 
+#%% Fonction de comptage alphas
+
 def event_counting_alpha(alpha_matrix, 
                          plot_result=False) :
 
@@ -53,7 +55,7 @@ def event_counting_alpha(alpha_matrix,
     
     return alpha_count
 
-#%% Fonction de comptage beta/muons/
+#%% Fonction de comptage betas/muons/alphas qui ont fuité
 
 def event_counting_electron_muon(electron_muon_matrix, plot_result=False,
                                 eccentricity_threshold_muon = 0.99,
@@ -98,16 +100,17 @@ def event_counting_electron_muon(electron_muon_matrix, plot_result=False,
     mapping[labels] = class_per_label
     classification_matrix = mapping[labeled_matrix]
     
-    alpha_positions = np.argwhere(classification_matrix == 3)
-
+    muon_only_matrix = (classification_matrix == 2).astype(int)
+    alpha_only_matrix = (classification_matrix == 3).astype(int)
+    
     if plot_result:
         plt.figure(figsize=(10,10))
         plt.imshow(classification_matrix, cmap='turbo', origin='upper')
         plt.title(f"Classification des particules (Électrons: {electron_count}, Muons: {muon_count}, Alphas: {alpha_count})")
         plt.xlabel("X")
         plt.ylabel("Y")
-    
-    return electron_count, muon_count, alpha_count, alpha_positions
+        
+    return electron_count, muon_count, alpha_count, muon_only_matrix, alpha_only_matrix
 
 
 #%% Fonction de comptage photons
@@ -122,4 +125,3 @@ def event_counting_photon(photon_matrix) :
     photon_count = label(photon_matrix, structure=structure)[1]
     
     return photon_count
-
