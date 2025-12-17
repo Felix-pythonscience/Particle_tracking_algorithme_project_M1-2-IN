@@ -66,7 +66,9 @@ def event_counting_electron_muon(electron_muon_matrix, plot_result=False,
 
     # Si matrice vide -> problème
     if not np.any(electron_muon_matrix):
-        return 0,0,0
+        # Align return signature: counts plus classified masks even when empty
+        zero_matrix = np.zeros_like(electron_muon_matrix)
+        return 0, 0, 0, zero_matrix, zero_matrix
 
     # Labelise et compte le nombre de cluster trouvé
     structure = np.ones((3, 3), dtype=int)  # crée une matrice 2D 3c et 3l de 1 qui correspond aux 8 positions possibles autour du pixel observé

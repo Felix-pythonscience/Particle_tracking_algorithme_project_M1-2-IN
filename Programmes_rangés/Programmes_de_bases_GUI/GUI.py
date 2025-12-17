@@ -117,11 +117,12 @@ class CountWorker(QThread):
                     # No time info, use all slices
                     filtered_slices = self.pre_sliced_images
                 
-                print(f"Filtered {len(filtered_slices)} slices from {len(self.pre_sliced_images)} total (t_min={self.time_min}, t_max={self.time_max})")
-                
                 totals = {"alpha": 0, "electrons": 0, "muons": 0, "gamma": 0}
-                # Build composite RGB image where last particle wins
-                composite_rgb = np.zeros((256, 256, 3), dtype=np.uint8) if self.return_images else None
+                # Accumulate per-particle masks and original for grayscale preview
+                accum_alpha = np.zeros((256, 256), dtype=np.float32) if self.return_images else None
+                accum_electrons = np.zeros((256, 256), dtype=np.float32) if self.return_images else None
+                accum_muons = np.zeros((256, 256), dtype=np.float32) if self.return_images else None
+                accum_gamma = np.zeros((256, 256), dtype=np.float32) if self.return_images else None
                 original_composite = np.zeros((256, 256), dtype=np.float32) if self.return_images else None
                 
                 for img in filtered_slices:
@@ -135,42 +136,29 @@ class CountWorker(QThread):
                         except Exception:
                             pass
                     
-                    # Build composite image where last particle overwrites previous (last wins)
+                    # Accumulate masks per particle type
                     if self.return_images and results.get("Images") is not None:
                         slice_images = results.get("Images")
                         img_alpha = slice_images.get('alpha', np.zeros((256, 256)))
-                        img_tracks = slice_images.get('tracks', np.zeros((256, 256)))
+                        img_electrons = slice_images.get('electrons', np.zeros((256, 256)))
+                        img_muons = slice_images.get('muons', np.zeros((256, 256)))
                         img_gamma = slice_images.get('gamma', np.zeros((256, 256)))
                         img_original = slice_images.get('original', np.zeros((256, 256)))
-                        
-                        # Update original composite (always accumulate for grayscale mode)
+
+                        # Accumulate masks (logical OR via max) and grayscale original
+                        accum_alpha = np.maximum(accum_alpha, img_alpha)
+                        accum_electrons = np.maximum(accum_electrons, img_electrons)
+                        accum_muons = np.maximum(accum_muons, img_muons)
+                        accum_gamma = np.maximum(accum_gamma, img_gamma)
                         original_composite += img_original
-                        
-                        # For RGB mode: last particle wins (overwrites previous color)
-                        # Priority order for simultaneous detections: gamma > tracks > alpha
-                        alpha_pixels = img_alpha > 0
-                        tracks_pixels = img_tracks > 0
-                        gamma_pixels = img_gamma > 0
-                        
-                        # Apply colors in order (later ones overwrite earlier ones)
-                        composite_rgb[alpha_pixels, 0] = 255  # Red for alpha
-                        composite_rgb[alpha_pixels, 1] = 0
-                        composite_rgb[alpha_pixels, 2] = 0
-                        
-                        composite_rgb[tracks_pixels, 0] = 0
-                        composite_rgb[tracks_pixels, 1] = 0
-                        composite_rgb[tracks_pixels, 2] = 255  # Blue for tracks
-                        
-                        composite_rgb[gamma_pixels, 0] = 0
-                        composite_rgb[gamma_pixels, 1] = 255  # Green for gamma
-                        composite_rgb[gamma_pixels, 2] = 0
                 
                 # Package results in the expected format
                 if self.return_images:
                     accumulated_images = {
-                        'alpha': (composite_rgb[:, :, 0] > 0).astype(np.float32),
-                        'tracks': (composite_rgb[:, :, 2] > 0).astype(np.float32),
-                        'gamma': (composite_rgb[:, :, 1] > 0).astype(np.float32),
+                        'alpha': accum_alpha,
+                        'electrons': accum_electrons,
+                        'muons': accum_muons,
+                        'gamma': accum_gamma,
                         'original': np.clip(original_composite, 0, 1)
                     }
                 else:
@@ -213,7 +201,7 @@ class MainWindow(QMainWindow):
 
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("Tri - GUI Qt (PySide6)")
+        self.setWindowTitle("Particle Sorting - GUI (PySide6)")
         self.resize(1000, 700)
 
         # state
@@ -256,8 +244,8 @@ class MainWindow(QMainWindow):
         self.btn_run.clicked.connect(self.run_global_counting)
         ctrl_layout.addWidget(self.btn_run)
 
-        # Bouton d'annulation, actif uniquement pendant un traitement
-        self.btn_cancel = QPushButton("Annuler")
+        # Cancel button, active only during a run
+        self.btn_cancel = QPushButton("Cancel")
         self.btn_cancel.setEnabled(False)
         self.btn_cancel.clicked.connect(self.cancel_counting)
         ctrl_layout.addWidget(self.btn_cancel)
@@ -275,6 +263,14 @@ class MainWindow(QMainWindow):
         self.lbl_preview.setStyleSheet("background: #111; border: 1px solid #444")
         self.lbl_preview.setScaledContents(True)
         preview_layout.addWidget(self.lbl_preview, alignment=Qt.AlignCenter)
+        # Save preview button (saved PNG of currently displayed preview)
+        btn_row = QHBoxLayout()
+        self.save_preview_btn = QPushButton("Save image")
+        self.save_preview_btn.setEnabled(False)
+        self.save_preview_btn.clicked.connect(self._save_preview_image)
+        btn_row.addWidget(self.save_preview_btn)
+        btn_row.addStretch()
+        preview_layout.addLayout(btn_row)
 
         
         
@@ -296,8 +292,13 @@ class MainWindow(QMainWindow):
         time_windows_layout.addWidget(lbl_value)
 
         self.time_window_value = QDoubleSpinBox()
-        self.time_window_value.setRange(1e-6, 10_000)
-        self.time_window_value.setValue(150)  # valeur initiale
+        # Ranges depend on unit: ticks -> [4 ticks (0.1 µs), 5e12 ticks]; seconds -> converted range
+        self.ratio_ticks_per_second = 39806550.8  # 1 sec = 39806550.8 ticks
+        self.time_window_value.setRange(4, 5e12)  # initial unit = ticks
+        self.time_window_value.setDecimals(15)  # Allow very small decimal values (scientific notation)
+        self.time_window_value.setValue(150)  # valeur initiale en ticks
+        # Use a custom formatter for scientific notation
+        self._setup_spinbox_scientific_notation(self.time_window_value)
         time_windows_layout.addWidget(self.time_window_value)
 
         # Variable associée
@@ -326,40 +327,81 @@ class MainWindow(QMainWindow):
 
 
         # Box 4.2 : Visulalisation options for results
-        visualisation_box = QGroupBox("Visualisation")
+        visualisation_box = QGroupBox("Visualization")
         visualisation_layout = QVBoxLayout(visualisation_box)
         
         # Box 4.2.1 Options de couleurs et de choix de particules
-        color_options_group = QGroupBox("Options de visualisation")
+        color_options_group = QGroupBox("Visualization options")
         color_options_layout = QVBoxLayout(color_options_group)
-        # Bouton pour lancer la visualisation
-        self.btn_visualisation = QPushButton("Visualisation")
+        # Button to start visualization
+        self.btn_visualisation = QPushButton("Visualize")
         self.btn_visualisation.clicked.connect(self.run_visualisation_counting)
         color_options_layout.addWidget(self.btn_visualisation)
         
-        # Checkbox pour activer le code couleur
-        self.chk_color_code = QCheckBox("Code couleur pour particules")
+        # Checkbox to enable particle color coding
+        self.chk_color_code = QCheckBox("Particle color code")
         self.chk_color_code.setChecked(False)
         self.chk_color_code.stateChanged.connect(self.on_color_code_changed)
         color_options_layout.addWidget(self.chk_color_code)
         
-        # Légende des couleurs
-        legend_group = QGroupBox("Légende")
+        # Legend for colors
+        legend_group = QGroupBox("Legend")
         legend_layout = QVBoxLayout(legend_group)
         legend_layout.setSpacing(2)
         legend_layout.setContentsMargins(4, 4, 4, 4)
         
-        lbl_alpha = QLabel("🔴 Rouge : Alpha")
-        lbl_alpha.setStyleSheet("color: red; font-weight: bold;")
-        legend_layout.addWidget(lbl_alpha)
-        
-        lbl_gamma = QLabel("🟢 Vert : Gamma")
+        # Checkboxes + labels so the user can toggle visibility per particle type
+        h_alpha = QHBoxLayout()
+        self.chk_show_alpha = QCheckBox()
+        self.chk_show_alpha.setChecked(True)
+        self.chk_show_alpha.setToolTip("Show Alpha in visualization")
+        lbl_alpha = QLabel("🟡 Yellow : Alpha")
+        lbl_alpha.setStyleSheet("color: #dcbf00; font-weight: bold;")
+        h_alpha.addWidget(self.chk_show_alpha)
+        h_alpha.addWidget(lbl_alpha)
+        h_alpha.addStretch()
+        legend_layout.addLayout(h_alpha)
+
+        h_muons = QHBoxLayout()
+        self.chk_show_muons = QCheckBox()
+        self.chk_show_muons.setChecked(True)
+        self.chk_show_muons.setToolTip("Show Muons in visualization")
+        lbl_muons = QLabel("🔴 Red : Muons")
+        lbl_muons.setStyleSheet("color: red; font-weight: bold;")
+        h_muons.addWidget(self.chk_show_muons)
+        h_muons.addWidget(lbl_muons)
+        h_muons.addStretch()
+        legend_layout.addLayout(h_muons)
+
+        h_elec = QHBoxLayout()
+        self.chk_show_electrons = QCheckBox()
+        self.chk_show_electrons.setChecked(True)
+        self.chk_show_electrons.setToolTip("Show Electrons in visualization")
+        lbl_elec = QLabel("🔵 Blue : Electrons")
+        lbl_elec.setStyleSheet("color: blue; font-weight: bold;")
+        h_elec.addWidget(self.chk_show_electrons)
+        h_elec.addWidget(lbl_elec)
+        h_elec.addStretch()
+        legend_layout.addLayout(h_elec)
+
+        h_gamma = QHBoxLayout()
+        self.chk_show_gamma = QCheckBox()
+        self.chk_show_gamma.setChecked(True)
+        self.chk_show_gamma.setToolTip("Show Gamma in visualization")
+        lbl_gamma = QLabel("🟢 Green : Gamma")
         lbl_gamma.setStyleSheet("color: green; font-weight: bold;")
-        legend_layout.addWidget(lbl_gamma)
-        
-        lbl_tracks = QLabel("🔵 Bleu : Tracks (e⁻/μ)")
-        lbl_tracks.setStyleSheet("color: blue; font-weight: bold;")
-        legend_layout.addWidget(lbl_tracks)
+        h_gamma.addWidget(self.chk_show_gamma)
+        h_gamma.addWidget(lbl_gamma)
+        h_gamma.addStretch()
+        legend_layout.addLayout(h_gamma)
+        # Connect checkbox changes to preview update
+        try:
+            self.chk_show_alpha.stateChanged.connect(self._on_legend_checkbox_changed)
+            self.chk_show_muons.stateChanged.connect(self._on_legend_checkbox_changed)
+            self.chk_show_electrons.stateChanged.connect(self._on_legend_checkbox_changed)
+            self.chk_show_gamma.stateChanged.connect(self._on_legend_checkbox_changed)
+        except Exception:
+            pass
         
         color_options_layout.addWidget(legend_group)
         color_options_layout.addStretch()
@@ -369,13 +411,13 @@ class MainWindow(QMainWindow):
         # box 4.2.2 Bornes temporelles pour la visualisation
 
         # Time range slider (t_min and t_max) avec deux curseurs sur une seule barre
-        time_range_group = QGroupBox("Plage temporelle (t_min / t_max)")
+        time_range_group = QGroupBox("Time range (t_min / t_max)")
         time_range_layout = QVBoxLayout(time_range_group)
 
         # Labels pour afficher les valeurs
         values_layout = QHBoxLayout()
-        self.lbl_tmin_max_value = QLabel(f"t_min = {self.t_min:.3e} t_max = {self.t_max:.3e}")
-
+        self.lbl_tmin_max_value = QLabel(f"t_min = 0.000e+00 {self.time_window_unit.currentText()}   |   Duration = 0.000e+00 {self.time_window_unit.currentText()}   |   t_max = 0.000e+00 {self.time_window_unit.currentText()}")
+        self.lbl_tmin_max_value.setAlignment(Qt.AlignCenter)
         values_layout.addWidget(self.lbl_tmin_max_value)
         values_layout.addStretch()
         time_range_layout.addLayout(values_layout)
@@ -404,21 +446,24 @@ class MainWindow(QMainWindow):
             g = QGroupBox(name.capitalize())
             v = QVBoxLayout(g)
 
-            # Label Visualisation (bleu)
-            lbl_visualisation = QLabel("Visualisation : -")
+
+            # Label Visualization (blue)
+            lbl_visualisation = QLabel("Visualization : -")
             lbl_visualisation.setAlignment(Qt.AlignCenter)
             lbl_visualisation.setStyleSheet(
-                "font-size: 14px; font-weight: bold; color: blue;"
+                "font-size: 16px; font-weight: bold; color: blue;"
             )
             v.addWidget(lbl_visualisation)
-
             # Label Global (noir)
             lbl_global = QLabel("Global : -")
             lbl_global.setAlignment(Qt.AlignCenter)
             lbl_global.setStyleSheet(
-                "font-size: 18px; font-weight: bold; color: black;"
+                "font-size: 16px; font-weight: bold; color: black;"
             )
             v.addWidget(lbl_global)
+
+            
+
 
             results_layout.addWidget(g)
 
@@ -440,7 +485,7 @@ class MainWindow(QMainWindow):
         main_layout.addWidget(self.status, alignment=Qt.AlignLeft)
 
         # Zone de progression (slicing + comptage)
-        self.progress_title = QLabel("Barres de progression")
+        self.progress_title = QLabel("Progress")
         self.progress_title.setStyleSheet("font-size:12px; font-weight:600; color: #111;")
         main_layout.addWidget(self.progress_title, alignment=Qt.AlignLeft)
 
@@ -471,7 +516,7 @@ class MainWindow(QMainWindow):
         self.slice_progress.setFormat("%p%")
         main_layout.addWidget(self.slice_progress)
 
-        self.count_label = QLabel("Comptage")
+        self.count_label = QLabel("Counting")
         self.count_label.setStyleSheet("font-size:12px; font-weight:600; color: #111; margin-top:4px;")
         main_layout.addWidget(self.count_label, alignment=Qt.AlignLeft)
 
@@ -500,6 +545,24 @@ class MainWindow(QMainWindow):
         
 
     # ------------------ UI actions ------------------
+    def _setup_spinbox_scientific_notation(self, spinbox):
+        """Setup a spinbox to display values in scientific notation."""
+        spinbox.setPrefix("")
+        spinbox.setSuffix("")
+        # Create a custom validator/formatter by overriding text display
+        # This is done via the spinbox's internal text update mechanism
+        original_value_from_text = spinbox.valueFromText
+        
+        def text_from_value(val):
+            # Format as scientific notation with 3 decimals
+            if val == 0:
+                return "0.000e+00"
+            return f"{val:.3e}"
+        
+        # Monkey-patch the spinbox to use scientific notation for display
+        spinbox.textFromValue = text_from_value
+        spinbox.setValue(spinbox.value())  # Trigger update
+    
     def select_file(self):
         """Open a file dialog and set the selected file.
 
@@ -514,25 +577,77 @@ class MainWindow(QMainWindow):
         self._try_preview(p)
 
     def on_time_window_changed(self, value):
-        self.time_window = value * (1 if self.time_window_unit == "ticks" else 39806550.8)
-        
-    
+        # update internal value (GUI spinbox changed)
+        # Internally, self.time_window is always stored in ticks
+        current_unit = self.time_window_unit.currentText() if hasattr(self.time_window_unit, "currentText") else getattr(self, "time_window_unit_value", "ticks")
+        self.time_window = value if current_unit == "ticks" else value * self.ratio_ticks_per_second
 
     def on_time_window_unit_changed(self, unit):
+        """Handle switching the time-window unit (ticks <-> seconds)."""
+        old_unit = getattr(self, "time_window_unit_value", "ticks")
+        if unit == old_unit:
+            return
+
+        current_value = self.time_window_value.value()
+
+        # Convert the displayed value when switching units and update allowed ranges
+        if old_unit == "ticks" and unit.startswith("seconds"):
+            # ticks -> seconds: divide by ratio
+            new_value = current_value / self.ratio_ticks_per_second
+            # allowed range for seconds: 4 ticks / ratio to 5e12 ticks / ratio
+            self.time_window_value.setRange(4 / self.ratio_ticks_per_second, 5e12 / self.ratio_ticks_per_second)
+            self.time_window_value.setDecimals(15)
+        elif old_unit.startswith("seconds") and unit == "ticks":
+            # seconds -> ticks: multiply by ratio
+            new_value = current_value * self.ratio_ticks_per_second
+            self.time_window_value.setRange(4, 5e12)
+            self.time_window_value.setDecimals(1)
+        else:
+            new_value = current_value
+
+        # Clamp and set
+        min_val = self.time_window_value.minimum()
+        max_val = self.time_window_value.maximum()
+        new_value = min(max(new_value, min_val), max_val)
+
+        self.time_window_value.blockSignals(True)
+        self.time_window_value.setValue(new_value)
+        self.time_window_value.blockSignals(False)
+
+        # Store unit and update internal ticks value and display
         self.time_window_unit_value = unit
-        self.time_window = self.time_window * (1 if unit == "ticks" else 39806550.8)
+        self.time_window = self.time_window_value.value() if unit == "ticks" else self.time_window_value.value() * self.ratio_ticks_per_second
+        self._update_time_range_display(unit)
 
     def on_time_range_changed(self, values):
         """Update t_min and t_max from range slider (tuple of two values)."""
         min_val, max_val = values
         self.t_min = (min_val / 1000.0) * self.data_t_max
         self.t_max = (max_val / 1000.0) * self.data_t_max
-        self.lbl_tmin_max_value.setText(f"t_min = {self.t_min:.3e}   t_max = {self.t_max:.3e}")
+        # Update display with current unit
+        current_unit = self.time_window_unit.currentText() if hasattr(self.time_window_unit, "currentText") else "ticks"
+        self._update_time_range_display(current_unit)
+
+    def _update_time_range_display(self, unit):
+        """Update the time range label display based on current unit."""
+        if unit.startswith("seconds"):
+            t_min_display = self.t_min / self.ratio_ticks_per_second
+            t_max_display = self.t_max / self.ratio_ticks_per_second
+            duration_display = (self.t_max - self.t_min) / self.ratio_ticks_per_second
+        else:
+            t_min_display = self.t_min
+            t_max_display = self.t_max
+            duration_display = self.t_max - self.t_min
+        self.lbl_tmin_max_value.setText(
+            f"t_min = {t_min_display:.3e} {unit}   |   "
+            f"Duration = {duration_display:.3e} {unit}   |   "
+            f"t_max = {t_max_display:.3e} {unit}"
+        )
     
     def on_color_code_changed(self, state):
-        """Active ou désactive le code couleur pour la visualisation."""
-        self.use_color_code = bool(state)  # state est 0 (décoché) ou 2 (coché)
-        print(f"Checkbox changée: state={state}, use_color_code={self.use_color_code}")
+        """Enable or disable particle color coding for visualization."""
+        self.use_color_code = bool(state)  # state is 0 (unchecked) or 2 (checked)
+        # No debug print; state stored in self.use_color_code
 
     def _try_preview(self, path: str):
         """Try to make a quick 256x256 preview from a saved .npy cluster file.
@@ -553,12 +668,20 @@ class MainWindow(QMainWindow):
                         qimg = numpy_to_qimage(img)
                         pix = QPixmap.fromImage(qimg).scaled(self.lbl_preview.size(), Qt.KeepAspectRatio)
                         self.lbl_preview.setPixmap(pix)
+                        try:
+                            self.save_preview_btn.setEnabled(True)
+                        except Exception:
+                            pass
                         return
         except Exception:
             # Any failure here is non-fatal for the GUI
             pass
         self.lbl_preview.clear()
         self.lbl_preview.setText("No preview")
+        try:
+            self.save_preview_btn.setEnabled(False)
+        except Exception:
+            pass
 
     def run_global_counting(self):
         """Start the background worker to run compteur_particles_optimized.
@@ -607,7 +730,7 @@ class MainWindow(QMainWindow):
         self.btn_cancel.setEnabled(True)
     
     def run_visualisation_counting(self):
-        """Lance le comptage sur une seule fenêtre [t_min, t_max] et affiche l'image composite."""
+        """Run counting on a single window [t_min, t_max] and display the composite image."""
         if not self.selected_file:
             self.status.setText("Select a file first")
             return
@@ -619,7 +742,7 @@ class MainWindow(QMainWindow):
         self.btn_run.setEnabled(False)
         self.btn_select.setEnabled(False)
         self.btn_visualisation.setEnabled(False)
-        self.status.setText("Visualisation running...")
+        self.status.setText("Visualization running...")
         # reset progress bars
         for bar in (self.slice_progress, self.count_progress):
             bar.setValue(0)
@@ -642,7 +765,6 @@ class MainWindow(QMainWindow):
         
         # Use stored slices if available (from global counting)
         if self.global_slices is not None:
-            print(f"Using stored slices for visualisation")
             # Pas besoin d'utiliser le fichier, on utilise les slices pré-calculées
             self.worker = CountWorker(self.selected_file, discr_crit=discr_crit, is_global_count=False,
                                       return_images=True,  # récupérer les images filtrées
@@ -651,7 +773,6 @@ class MainWindow(QMainWindow):
                                       pre_slice_times=self.global_slice_times)  # Utiliser les temps des slices
         else:
             # Fallback: calculer une seule fenêtre depuis le fichier
-            print(f"No stored slices, computing single window from file")
             self.worker = CountWorker(self.selected_file, discr_crit=discr_crit, is_global_count=False,
                                       time_window=self.t_max - self.t_min,  # une seule fenêtre
                                       return_data_t_max=False,
@@ -667,16 +788,16 @@ class MainWindow(QMainWindow):
         self.btn_cancel.setEnabled(True)
 
     def cancel_counting(self):
-        """Demande l'annulation du comptage en cours."""
+        """Request cancellation of the running counting job."""
         if self.worker is None or not self.worker.isRunning():
             return
-        self.status.setText("Annulation en cours...")
+        self.status.setText("Cancelling...")
         self.btn_cancel.setEnabled(False)
         try:
             self.worker.requestInterruption()
-            # Optionnel : indiquer dans la barre de progression
-            self.slice_progress.setFormat("Annulation demandée...")
-            self.count_progress.setFormat("Annulation demandée...")
+            # Optionally indicate in the progress bar
+            self.slice_progress.setFormat("Cancellation requested...")
+            self.count_progress.setFormat("Cancellation requested...")
             self.cancelled = True
         except Exception:
             pass
@@ -684,21 +805,17 @@ class MainWindow(QMainWindow):
     def _on_finished(self, results: dict):
         """Update the result labels with the counts returned by the worker."""
         counts = results.get('Counts', {}) if isinstance(results, dict) else {}
-        which_label = int(self.is_global_count)  # 0 pour Visualisation, 1 pour Global
-        prefix = "Visualisation" if which_label == 0 else "Global"
+        which_label = int(self.is_global_count)  # 0 for Visualization, 1 for Global
+        prefix = "Visualization" if which_label == 0 else "Global"
         for category_name, label_pair in self.result_labels.items():
             count_value = counts.get(category_name, '-')
             label_pair[which_label].setText(f"{prefix} : {count_value}")
         
-        # Si mode visualisation, afficher l'image composite dans preview
+        # If in visualization mode, display the composite image in the preview
         if not self.is_global_count:
-            print(f"Mode visualisation détecté, is_global_count={self.is_global_count}")
             images = results.get('Images', None)
-            print(f"Images récupérées: {images is not None}")
             if images:
-                print(f"Clés des images: {images.keys() if isinstance(images, dict) else 'pas un dict'}")
                 composite, is_rgb = self._create_composite_image(images)
-                print(f"Composite créé: shape={composite.shape if composite is not None else None}, is_rgb={is_rgb}")
                 if composite is not None:
                     if is_rgb:
                         qimg = numpy_to_qimage_rgb(composite)
@@ -706,11 +823,12 @@ class MainWindow(QMainWindow):
                         qimg = numpy_to_qimage(composite)
                     pix = QPixmap.fromImage(qimg).scaled(self.lbl_preview.size(), Qt.KeepAspectRatio)
                     self.lbl_preview.setPixmap(pix)
-                    print("Image affichée dans preview!")
-                else:
-                    print("Composite est None!")
-            else:
-                print("Pas d'images dans les résultats!")
+                # store last visualization images so checkboxes can update preview
+                self._last_visualization_images = images
+                try:
+                    self.save_preview_btn.setEnabled(True)
+                except Exception:
+                    pass
         
         # Update slider ranges with real data t_max if available
         if 'data_t_max' in results and results['data_t_max'] is not None:
@@ -728,18 +846,17 @@ class MainWindow(QMainWindow):
             if slices is not None:
                 self.global_slices = slices
                 self.global_slice_times = slice_times
-                print(f"Stored {len(slices)} slices from global counting with {len(slice_times) if slice_times is not None else 0} times")
-        # Si annulé, on laisse les barres à leur valeur courante
+        # If cancelled, leave bars at their current value
         if self.cancelled:
             self.status.setText("Cancelled")
-            self.slice_progress.setFormat("Annulé")
-            self.count_progress.setFormat("Annulé")
+            self.slice_progress.setFormat("Cancelled")
+            self.count_progress.setFormat("Cancelled")
         else:
             self.status.setText("Done")
             self.slice_progress.setValue(100)
-            self.slice_progress.setFormat("Terminé")
+            self.slice_progress.setFormat("Finished")
             self.count_progress.setValue(100)
-            self.count_progress.setFormat("Terminé")
+            self.count_progress.setFormat("Finished")
         self.btn_run.setEnabled(True)
         self.btn_select.setEnabled(True)
         self.btn_visualisation.setEnabled(True)
@@ -750,40 +867,56 @@ class MainWindow(QMainWindow):
         self.cancelled = False
 
     def _create_composite_image(self, images: dict):
-        """Crée une image composite RGB à partir des images filtrées.
-        
+        """Create an RGB composite image from the filtered per-particle images.
+
         Args:
-            images: Dict contenant 'alpha', 'tracks', 'gamma' (images 256x256)
-        
+            images: Dict containing 'alpha', 'electrons', 'muons', 'gamma' (256x256 images)
+
         Returns:
-            Tuple (image_array, is_rgb): image et booléen indiquant si c'est RGB
+            Tuple (image_array, is_rgb): NumPy image array and a boolean indicating if it's RGB
         """
         try:
-            # Récupérer les images
+            # Retrieve the images
             img_alpha = images.get('alpha', np.zeros((256, 256)))
-            img_tracks = images.get('tracks', np.zeros((256, 256)))  # electrons + muons
+            img_muons = images.get('muons', np.zeros((256, 256)))
+            img_electrons = images.get('electrons', np.zeros((256, 256)))
             img_gamma = images.get('gamma', np.zeros((256, 256)))
             img_original = images.get('original', np.zeros((256, 256)))
             
-            print(f"use_color_code = {self.use_color_code}")
-            print(f"Alpha pixels non-nuls: {np.count_nonzero(img_alpha)}")
-            print(f"Tracks pixels non-nuls: {np.count_nonzero(img_tracks)}")
-            print(f"Gamma pixels non-nuls: {np.count_nonzero(img_gamma)}")
-            print(f"Original pixels non-nuls: {np.count_nonzero(img_original)}")
-            
+            # Respect legend checkboxes (if present) — hide categories that are unchecked
+            try:
+                if not self.chk_show_alpha.isChecked():
+                    img_alpha = np.zeros_like(img_alpha)
+                if not self.chk_show_muons.isChecked():
+                    img_muons = np.zeros_like(img_muons)
+                if not self.chk_show_electrons.isChecked():
+                    img_electrons = np.zeros_like(img_electrons)
+                if not self.chk_show_gamma.isChecked():
+                    img_gamma = np.zeros_like(img_gamma)
+            except Exception:
+                pass
+
             if self.use_color_code:
-                print("Mode COULEUR activé!")
-                # Code couleur: alpha=rouge, tracks=bleu, gamma=vert
+                # Color code: alpha=yellow (R+G), muons=red, electrons=blue, gamma=green
                 composite = np.zeros((256, 256, 3), dtype=np.uint8)
-                composite[:, :, 0] = np.clip(img_alpha * 255, 0, 255).astype(np.uint8)  # Rouge pour alpha
-                composite[:, :, 1] = np.clip(img_gamma * 255, 0, 255).astype(np.uint8)  # Vert pour gamma
-                composite[:, :, 2] = np.clip(img_tracks * 255, 0, 255).astype(np.uint8)  # Bleu pour tracks
-                print(f"Composite RGB créé, shape={composite.shape}, pixels non-nuls par canal: R={np.count_nonzero(composite[:,:,0])}, G={np.count_nonzero(composite[:,:,1])}, B={np.count_nonzero(composite[:,:,2])}")
-                return composite, True  # Retourner l'image RGB
+                composite[:, :, 0] = np.clip(img_muons * 255, 0, 255).astype(np.uint8)  # red for muons
+                composite[:, :, 1] = np.clip(img_gamma * 255, 0, 255).astype(np.uint8)   # green for gamma
+                composite[:, :, 2] = np.clip(img_electrons * 255, 0, 255).astype(np.uint8) # blue for electrons
+                # Add alpha as yellow (R + G)
+                composite[:, :, 0] = np.clip(composite[:, :, 0].astype(np.int16) + (img_alpha * 255).astype(np.int16), 0, 255).astype(np.uint8)
+                composite[:, :, 1] = np.clip(composite[:, :, 1].astype(np.int16) + (img_alpha * 255).astype(np.int16), 0, 255).astype(np.uint8)
+                return composite, True
             else:
-                print("Mode GRAYSCALE")
-                # Grayscale: somme de toutes les détections
-                return np.clip(img_original * 255, 0, 255).astype(np.uint8), False
+                # Grayscale: combine selected per-particle masks (respecting checkboxes)
+                combined = np.zeros_like(img_alpha, dtype=np.float32)
+                combined = np.clip(combined + img_alpha, 0, 1)
+                combined = np.clip(combined + img_muons, 0, 1)
+                combined = np.clip(combined + img_electrons, 0, 1)
+                combined = np.clip(combined + img_gamma, 0, 1)
+                # If nothing selected, fallback to original TOT image
+                if not np.any(combined):
+                    combined = img_original
+                return np.clip(combined * 255, 0, 255).astype(np.uint8), False
         except Exception as e:
             print(f"Error creating composite image: {e}")
             traceback.print_exc()
@@ -800,6 +933,29 @@ class MainWindow(QMainWindow):
         self.progress_phase = "slicing"
         self.last_pct = 0
         self.cancelled = False
+
+    def _save_preview_image(self):
+        """Open a save dialog and save the currently displayed preview as PNG."""
+        try:
+            pix = self.lbl_preview.pixmap()
+            if pix is None:
+                self.status.setText("No image to save")
+                return
+            start_dir = os.getcwd()
+            path, _ = QFileDialog.getSaveFileName(self, "Save preview image", start_dir, "PNG Files (*.png)")
+            if not path:
+                return
+            if not path.lower().endswith('.png'):
+                path = path + '.png'
+            success = pix.save(path, 'PNG')
+            if success:
+                self.status.setText(f"Saved image: {Path(path).name}")
+            else:
+                self.status.setText("Failed to save image")
+        except Exception as e:
+            print(f"Error saving preview: {e}")
+            traceback.print_exc()
+            self.status.setText("Error saving image")
 
     def _on_progress(self, progress: float, message: str):
         """Update the status bar with progress from the worker.
@@ -833,6 +989,27 @@ class MainWindow(QMainWindow):
         display_msg = f"{msg} ({pct}%)" if msg else f"{pct}%"
         target_bar.setFormat(display_msg)
         self.last_pct = pct
+
+    def _on_legend_checkbox_changed(self, _state):
+        """Update preview when a legend checkbox changes (visualization mode)."""
+        try:
+            if not self.is_global_count and getattr(self, '_last_visualization_images', None) is not None:
+                images = self._last_visualization_images
+                composite, is_rgb = self._create_composite_image(images)
+                if composite is not None:
+                    if is_rgb:
+                        qimg = numpy_to_qimage_rgb(composite)
+                    else:
+                        qimg = numpy_to_qimage(composite)
+                    pix = QPixmap.fromImage(qimg).scaled(self.lbl_preview.size(), Qt.KeepAspectRatio)
+                    self.lbl_preview.setPixmap(pix)
+                    try:
+                        self.save_preview_btn.setEnabled(True)
+                    except Exception:
+                        pass
+        except Exception:
+            # don't let preview updates break the UI
+            pass
 
 def main():
     app = QApplication(sys.argv)

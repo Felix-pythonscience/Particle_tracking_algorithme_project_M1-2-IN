@@ -9,7 +9,7 @@ try:
     from .read_file import read, slice, slice_Tot,optimised_slice
     from .filtres import filtre_alpha, filtre_tracks
     from .plot_results import plot_results
-    from .event_detector_v3_2 import event_counting_alpha, event_counting_electron_muon,event_counting_photon
+    from .event_detector_v6 import event_counting_alpha, event_counting_electron_muon,event_counting_photon
     # diagnostic: indicate which import branch succeeded
    
 except Exception:
@@ -18,7 +18,7 @@ except Exception:
     from read_file import read, slice, slice_Tot,optimised_slice
     from filtres import filtre_alpha, filtre_tracks
     from plot_results import plot_results
-    from event_detector_v3_2 import event_counting_alpha, event_counting_electron_muon,event_counting_photon
+    from event_detector_v6 import event_counting_alpha, event_counting_electron_muon,event_counting_photon
     # diagnostic: indicate fallback import used
    
 
@@ -72,6 +72,7 @@ def compteur_particles(file = "None", t= 0, d_time = None, plot = False, block =
 
         image = slice(data.to_numpy(), t, d_time)
 
+    
     # Morphological filtering of alpha
     image_without_alpha, image_alpha = filtre_alpha(image)# Appliquer le filtre pour enlever les tracks
 
@@ -84,7 +85,7 @@ def compteur_particles(file = "None", t= 0, d_time = None, plot = False, block =
     image_gamma, image_tracks = filtre_tracks(image_without_alpha)
 
 
-    N_electrons , N_muons, N_alpha_corr, _ = event_counting_electron_muon(
+    N_electrons , N_muons, N_alpha_corr, Muon_matrix , Alpha_correction_matrix = event_counting_electron_muon(
                                                                        electron_muon_matrix=image_tracks,
                                                                        eccentricity_threshold_muon=discrimination_criteria["electron_muon"].get("eccentricity_threshold_muon", 0.99),
                                                                        area_threshold_muon=discrimination_criteria["electron_muon"].get("area_threshold_muon", 25),
@@ -92,6 +93,13 @@ def compteur_particles(file = "None", t= 0, d_time = None, plot = False, block =
                                                                        solidity_threshold_alpha=discrimination_criteria["electron_muon"].get("solidity_threshold_alpha", 1),
                                                                        area_threshold_alpha=discrimination_criteria["electron_muon"].get("area_threshold_alpha", 9))
     
+    # Safe arithmetic on small integer matrices
+    electrons_image = (image_tracks.astype(np.int16) - Muon_matrix.astype(np.int16) - Alpha_correction_matrix.astype(np.int16))
+    electrons_image = np.clip(electrons_image, 0, 255).astype(np.uint8)
+
+    image_alpha = (image_alpha.astype(np.int16) + Alpha_correction_matrix.astype(np.int16))
+    image_alpha = np.clip(image_alpha, 0, 255).astype(np.uint8)
+
 
     N_alpha += N_alpha_corr
 
@@ -107,7 +115,8 @@ def compteur_particles(file = "None", t= 0, d_time = None, plot = False, block =
             "Images": None if not return_images else {
                 "original": image,
                 "alpha": image_alpha,
-                "tracks": image_tracks,
+                "electrons": electrons_image,
+                "muons": Muon_matrix,
                 "gamma": image_gamma
             }
             }
@@ -115,14 +124,15 @@ def compteur_particles(file = "None", t= 0, d_time = None, plot = False, block =
     if plot:
 
         image_couleur = slice_Tot(data.to_numpy(), t, d_time) # Image coloriée par le TOT pour visualisation
-        plot_results(image, image_alpha, image_tracks, image_gamma, image_couleur, block = block, save=save)
+        plot_results(image, image_alpha, electrons_image, Muon_matrix, image_gamma, image_couleur, block = block, save=save)
 
     if save[0]:
         outdir = Path(save[2]) / Path(save[1])
         outdir.mkdir(parents=True, exist_ok=True)
         np.save(outdir / "image_originale.npy", image.astype(np.uint8), allow_pickle=False)
         np.save(outdir / "image_alpha.npy", image_alpha.astype(np.uint8), allow_pickle=False)
-        np.save(outdir / "image_tracks.npy", image_tracks.astype(np.uint8), allow_pickle=False)
+        np.save(outdir / "image_electrons.npy", electrons_image.astype(np.uint8), allow_pickle=False)
+        np.save(outdir / "image_muons.npy", Muon_matrix.astype(np.uint8), allow_pickle=False)
         np.save(outdir / "image_gamma.npy", image_gamma.astype(np.uint8), allow_pickle=False)
 
 
